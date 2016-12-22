@@ -1,4 +1,12 @@
+#if you run it on nix/osx it wont delete the temp file yet
 
+#Version History
+# 20161222 - initial commit
+# 20161223 - add psi, start parsing and additional url from iacis listserv 
+#
+#
+#
+#
 #To Install
 # ppm install URI (which I think comes with perl now)
 # requires python 2.7 installed to run the EI parser
@@ -6,6 +14,7 @@
 
 
 #To do ; put in download code for EI parser 
+# separate # from URL as it denotes a second search
 
 
 #Research
@@ -28,8 +37,7 @@ push @urls, "https://www.google.com.au/?gfe_rd=cr&ei=u_paWP7NHKbr8Af0vYcI"; #go 
 push @urls, "https://www.google.com.au/search?q=perl+scalars&oq=perl+scalars&aqs=chrome.0.0l6.4792j1j7&sourceid=chrome&ie=UTF-8";   #search in Google Chrome search bar for perl scalars, safe search on, not logged in
 push @urls, "https://www.google.com.au/search?q=push+array+perl&oq=push+&aqs=chrome.2.69i57j0l5.5225j1j7&sourceid=chrome&ie=UTF-8"; #search in Google Chrome search bar for push array perl, safe search on, typed partial then selected from suggested, , not logged in
 push @urls, "http://www.google.com/search?ie=UTF-8&oe=UTF-8&sourceid=navclient&gfns=1&q=target"; #taken from https://moz.com/blog/the-ultimate-guide-to-the-google-search-parameters, "gfns=1the link will take you to the first (organic) result for that term"
-
-
+push @urls, "https://www.google.com/search?q=vonnegut&hl=en&biw=1440&bih=728&site=webhp&ei=lTHWVqawIJikjwPj1J7ADA&start=140&sa=N&bav=on.2,or.&bvm=bv.115946447,d.cGc&fp=1a23df61796ce349&tch=1&ech=1&psi=ajHWVq-dGcP8jwP6w4G4Aw.1456877930638.29"; #provided in email on iacis listserv
 my $url;
 
 my $count = 0;
@@ -83,6 +91,8 @@ sub parse_URL($){
 		$parameters{$u} = parseEI($parameters{$u}) if ($u eq "ei");
 		$parameters{$u} = parseGFE_RD($parameters{$u}) if ($u eq "gfe_rd");
 		$parameters{$u} = parseGFNS($parameters{$u}) if ($u eq "gfns");
+		$parameters{$u} = parsePSI($parameters{$u}) if ($u eq "psi");
+		$parameters{$u} = parseStart($parameters{$u}) if ($u eq "start");
 		$parameters{$u} .= "\t(Original Query)" if ($u eq "oq");
 		$parameters{$u} .= "\t(Searched Query)" if ($u eq "q");
 		
@@ -105,11 +115,30 @@ sub parse_URL($){
 	return;
 }
 
+sub parsePSI($){
+	my $psi = shift;
+	my ($ei, $unix, $unknown) = split /\./, $psi;
+	
+	my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
+	system (qq{$command});
+	$ei = readTemp("temp")." UTC";
+	system (qq{del temp});
+	
+	#$unix last three digits removed to make it a unix timestamp. Should match the EI timestamp
+	$unix = substr($unix, 0, -3);
+	$unix = gmtime($unix);
+	
+	
+	$psi .= "\t\t($ei,$unix,$unknown)";
+	
+	return $psi;
+}
+
 sub parseEI($){
 	my $ei = shift;
 	my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
 	system (qq{$command});
-	$ei .= "\t\t(".readTemp("temp").")";
+	$ei .= "\t\t(".readTemp("temp")." UTC) - Session Start Time - Set by Google's Time Servers to indicate the start of a session";
 	system (qq{del temp});
 	return $ei;
 }
@@ -129,7 +158,13 @@ sub parseGFNS($){
 	}
 }
 
-
+sub parseStart($){
+# Determines page that the search is on
+# ie start=140 = page 15, so divide by 10 + 1
+	my $start = shift;
+	$start.= "\t\t(Page ".(($start/10)+1).")";
+	return $start;
+}
 
 sub readTemp($){
 	my $temp = shift;
