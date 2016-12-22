@@ -1,5 +1,7 @@
 #if you run it on nix/osx it wont delete the temp file yet
 
+#Created by Phill Moore - randomaccess3@gmail.com
+
 #Version History
 # 20161222 - initial commit
 # 20161223 - add psi, start parsing and additional url from iacis listserv 
