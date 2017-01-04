@@ -10,7 +10,7 @@
 # 20161226	- add ust (time parameter)
 #			- option for input from a file
 #			- cd  (results link position)
-#
+# 20170104  - fixed spacing error in file parsing
 #
 #
 #To Install
@@ -33,7 +33,7 @@
 #Original Query - If the original query is less than the q value then it's possible that the user has clicked on a suggested post - need more research on the topic
 
 
-
+my $ved_parser = "/Users/phill/Desktop/GoogleURLParser/protobuff/ved-decoder-master/ved.py";
 
 
 use Data::Dumper;
@@ -71,6 +71,7 @@ elsif ($config {file}){
 		chomp $line;
 
 		next if ($line =~ m/^\#.*/);
+		next if ($line =~ m/^$/);
 		my $comment;
 		($url,$comment) = split /\|/, $line;
 		$count++;
@@ -94,8 +95,14 @@ sub parse_URL($){
 	my %parameters = {};
 	my $url = shift;
 	
+	
+	$url =~ s/^http[s]:\/\///g if ($url =~ m/^http[s]:\/\//);
+	
+	# $url =~ s/^https\:\/\/[w*\.]google\..*\/(a-z*)\?//;
 	#remove http://www.google.com.*/.*?
-	$url =~ s/^.*google.*\?//g;
+	my ($google, @rest) = split /\//, $url;
+	$url = join('\/', @rest);
+	$url =~ s/\\\//\//g;
 		
 	$url =~ s/\?/\n/g;
 	$url =~ s/\&/\n/g;
@@ -115,9 +122,7 @@ sub parse_URL($){
 	#load hash with parameters
 	my $u;
 	foreach $u (@urlentries){
-		$parameters{$1} = $2 if ($u =~ m/(.*)=(.*)/g);
-		$parameters{$1} = uri_unescape($parameters{$1});
-		$parameters{$1} = uri_unescape($parameters{$1});
+		$parameters{$1} = uri_unescape($2) if ($u =~ m/(.*)=(.*)/g);
 	}
 
 	$u = "";
@@ -140,6 +145,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_pws($parameters{$u}) if ($u eq "pws");
 		$parameters{$u} = parse_safe($parameters{$u}) if ($u eq "safe");
 		$parameters{$u} = parse_ust($parameters{$u}) if ($u eq "ust");
+		$parameters{$u} = parse_VED($parameters{$u}) if ($u eq "ved");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");
 		$parameters{$u} .= "\t\t(Original Query)" if ($u eq "oq");
 		$parameters{$u} .= "\t\t(Searched Query)" if ($u eq "q");
@@ -178,9 +184,7 @@ sub parse_PSI($){
 	$unix = substr($unix, 0, -3);
 	$unix = gmtime($unix);
 	
-	
 	$psi .= "\t\t($ei,$unix,$unknown)";
-	
 	return $psi;
 }
 
@@ -250,14 +254,59 @@ sub parse_ust($){
 }
 
 
+#Ved parser by https://github.com/beschulz/ved-decoder
+sub parse_VED($){
+	my $ved = shift;
+	my $parsed = "";
+	# print "ved = $ved\n";
+	# my $command = "echo $ved > temp1";
+	# system (qq{$command});
+	# $command = "cat temp | $ved_parser"; 
+	# system (qq{$command});
+	# print "VED: ". readTemp("temp1")."\n\n\n\n";
+	return $ved;
+}
 
 
 
 
+#https://deedpolloffice.com/blog/articles/decoding-ved-parameter
+#     // Copyright 2013 Deed Poll Office Ltd, UK <https://deedpolloffice.com>
+#    // Licensed under Apache Licence v2.0 <http://apache.org/licenses/LICENSE-2.0>
 
+#sub parse_VED($){
+#	my $ved = shift;
+#	my $parsed;
+	
+	#my %keys = (
+ 	#	  	"t"  => "2",
+    #		"r" => "6",
+    #		"s"  => "7",
+    #		"i" => "1"
+	#);
+	#my $ret;
 
+	#if (substr($ved, 0, 1) == '1') {
+	 #       preg_match_all('/([a-z]+):([0-9]+)/i', $ved, $matches, PREG_SET_ORDER);
+ #       foreach ($matches as $m)
+#	    $ret[isset($keys[$m[1]]) ? $keys[$m[1]] : $m[1]] = (int) $m[2];
+	#	return "$ved\t\tPlain Text Encoded";
+    #}
+    #if (substr($ved, 0, 1) == '0') {
+	#	return "$ved\t\tProtobuff Encoded";
+    #}
 
-
+ #   preg_match_all('/([\x80-\xff]*[\0-\x7f])([\x80-\xff]*[\0-\x7f])/',
+#	base64_decode(str_replace(array('_','-'), array('+','/'), substr($ved, 1))),
+#	$matches, PREG_SET_ORDER);
+#    foreach ($matches as $m) {
+#	$key = $val = 0;
+#	foreach (str_split($m[1]) as $i => $c) $key += (ord($c) & 0x7f) << $i * 7;
+#	foreach (str_split($m[2]) as $i => $c) $val += (ord($c) & 0x7f) << $i * 7;
+#	$ret[$key >> 3] = $val;
+#    }
+#    return $ret;
+#}
 
 
 sub readTemp($){
@@ -288,17 +337,15 @@ sub printDivider{
 }
 
 
-
 sub _help {
 	print<< "EOT";
 googleURLParser v.$VERSION - Google URL Parser
 googleURLParser [-u url] [-f file] [-h]
 Parses Google Search and Redirect URLs to provide additional data
-
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
   -h.................Help
-
+  
 Lists: Required format is URL|Comment. The comment will be included in the output
 Lines beginning with # are ignored
 EOT
