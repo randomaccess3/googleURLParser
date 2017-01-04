@@ -16,6 +16,10 @@
 #			- started rlz parameter
 #			- added tbm
 #
+# 20170105  - updated GWS_RD, added client, formatting, sig2
+#			- added stubs for cad, esrc, rct, sa, uact, usg, web
+#
+#
 #To Install
 # ppm install URI (which I think comes with perl now)
 # requires python 2.7 installed to run the EI parser
@@ -26,6 +30,10 @@
 # separate # from URL as it denotes a second search
 # include the proto code for python
 # probably port to python
+
+# Known bug
+# Doesnt deal with # in search
+# Doesn't remove +'s in q or oq value
 
 #Research
 # http://www.ramdynamo.com/2014/03/google-gferdcr-url-mystery-revealed.html
@@ -111,6 +119,12 @@ sub parse_URL($){
 		
 	$url =~ s/\?/\n/g;
 	$url =~ s/\&/\n/g;
+	
+	# If a hash exists in the URL then the previous search was before the hash and the current search was in the q after the hash
+	if ($url =~ m/#/){
+			push @alerts, "# indicates second search - not implemented currently";
+	} 
+	
 	$url =~ s/\#/\n/g;
 	
 	#remove spaces
@@ -120,21 +134,18 @@ sub parse_URL($){
 
 	my @urlentries = split /\n/, $url;
 	
-	#Escape characters
-	#$url = uri_unescape($url);
-	#$url = uri_unescape($url); #required to run twice as sometimes not everything unescapes
 		
 	#load hash with parameters
 	my $u;
 	foreach $u (@urlentries){
-		$parameters{$1} = uri_unescape($2) if ($u =~ m/(.*)=(.*)/g);
+		$parameters{$1} = uri_unescape($2) if ($u =~ m/(.*)=(.*)/g); # may need to run uri_unescape twice
 	}
 
 	$u = "";
 	
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
-			push @alerts, "Either additional search, or suggested search was suggested from search bar (chrome)";
+			push @alerts, "Either additional search, or suggested search was suggested from search bar (tested on chrome)";
 	} 
 	
 	foreach $u (sort keys %parameters){
@@ -142,6 +153,9 @@ sub parse_URL($){
 		#Unsure why the hash has a HASH -> undef entry in it, this line skips it
 		next if (!defined($parameters{$u}));
 		
+		
+		# Sends the parameter value to the subroutine for parsing
+		# result is returned and printed on a new line with the parameter name
 		$parameters{$u} = parse_EI($parameters{$u}) if ($u eq "ei");
 		$parameters{$u} = parse_GFE_RD($parameters{$u}) if ($u eq "gfe_rd");
 		$parameters{$u} = parse_GWS_RD($parameters{$u}) if ($u eq "gws_rd");
@@ -156,12 +170,22 @@ sub parse_URL($){
 		$parameters{$u} = parse_aqs($parameters{$u}) if ($u eq "aqs");
 		$parameters{$u} = parse_rlz($parameters{$u}) if ($u eq "rlz");	
 		$parameters{$u} = parse_tbm($parameters{$u}) if ($u eq "tbm");	
+		$parameters{$u} = parse_client($parameters{$u}) if ($u eq "client");
+		$parameters{$u} = parse_q($parameters{$u}) if ($u eq "q");	
+		$parameters{$u} = parse_cad($parameters{$u}) if ($u eq "cad");	
+		$parameters{$u} = parse_esrc($parameters{$u}) if ($u eq "esrc");	
+		$parameters{$u} = parse_rct($parameters{$u}) if ($u eq "rct");	
+		$parameters{$u} = parse_uact($parameters{$u}) if ($u eq "uact");	
+		$parameters{$u} = parse_sa($parameters{$u}) if ($u eq "sa");
+		$parameters{$u} = parse_usg($parameters{$u}) if ($u eq "usg");		
+		$parameters{$u} = parse_source($parameters{$u}) if ($u eq "source");		
+		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Width)" if ($u eq "biw");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");
 		$parameters{$u} .= "\t\t\t\t(Original Query)" if ($u eq "oq");
-		$parameters{$u} .= "\t\t\t\t(Query that Search results are returned for)" if ($u eq "q");
 		$parameters{$u} .= "\t\t\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
+		$parameters{$u} .= "\t\t\t\t(Output Encoding)" if ($u eq "oe");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Usually indicates that this was opened in a new tab/window from the Search Results page)" if ($u eq "url");
 		
 		print "$u=$parameters{$u}\n";
@@ -216,20 +240,28 @@ sub parse_EI($){
 
 sub parse_GFE_RD($){
 	my $gfe_rd = shift;
-	if ($gfe_rd eq "cr"){
-		return "$gfe_rd\t\t\t\t(Country Redirect - Direct to your countries Google homepage)"
-	}
+	return "$gfe_rd\t\t\t\t(Country Redirect - Direct to your countries Google homepage)" if ($gfe_rd eq "cr");
 	return $gfe_rd;
 }
 
+sub parse_q($){
+	my $q = shift;
+	return "$q\t\t(Query not passed to search URL)" if ($q eq "");
+	return "$q\t\t(Query that Search results are returned for)";
+
+}
+
+
+# On Chrome
 # Go to google.com - redirect to .com.au and no gws_RD
 # go to google.com.au - no EI or gfe_rd, but gws_rd
 # go to https://www.google.com.au - no parameters, just search term
+# On IE
+# Similar, except when searching from the URL bar you get the cr,ssl value
 sub parse_GWS_RD($){
 	my $gws_rd = shift;
-	if ($gws_rd eq "ssl"){
-		return "$gws_rd\t\t\t\t(Redirect to SSL site)";
-	}
+	return "$gws_rd\t\t\t\t(Redirect to SSL site)" if ($gws_rd eq "ssl");
+	return "$gws_rd\t\t\t\t(Country Redirect and Redirect to SSL site - so far only seen on IE)" if ($gws_rd eq "cr,ssl");
 	return $gws_rd;
 }
 
@@ -237,17 +269,20 @@ sub parse_GWS_RD($){
 
 sub parse_GFNS($){
 	my $gfns = shift;
-	if ($gfns eq "1"){
-		return "$gfns\t\t\t\t(I'm feeling lucky - first organic result will be accessed)"
-	}
+	return "$gfns\t\t\t\t(I'm feeling lucky - first organic result will be accessed)" if ($gfns eq "1");
 	return $gfns;
 }
 
 sub parse_sourceid($){
 	my $sourceid = shift;
-	if ($sourceid eq "chrome"){
-		return "$sourceid\t\t\t\t(Google Chrome)"
-	}
+	return "$sourceid\t\t\t\t(Google Chrome)" if ($sourceid eq "chrome");
+}
+
+sub parse_client($){
+	my $client = shift;
+	return "$client\t\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
+	return "$client\t\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
+	return $client
 }
 
 
@@ -322,8 +357,43 @@ sub parse_ust($){
  #first 10 characters are a unix timestamp
 	my $unix = substr($ust, 0, 10);
 	$unix = gmtime($unix);
-	return "$ust\t\t($unix UTC)";
+	return "$ust\t\t($unix UTC - unsure of validity)";
 }
+
+
+sub parse_cad($){
+}
+
+sub parse_esrc($){
+}
+
+sub parse_rct($){
+}
+
+sub parse_sa($){
+}
+
+sub parse_uact($){
+}
+
+sub parse_usg($){
+}
+
+# so far have only seen source = web - havent tested on mobile
+sub parse_source($){
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #Ved parser by https://github.com/beschulz/ved-decoder
