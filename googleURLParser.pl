@@ -11,7 +11,10 @@
 #			- option for input from a file
 #			- cd  (results link position)
 # 20170104  - fixed spacing error in file parsing
-#
+#			- ie parameter
+#			- add bih/biw parameter
+#			- started rlz parameter
+#			- added tbm
 #
 #To Install
 # ppm install URI (which I think comes with perl now)
@@ -26,6 +29,8 @@
 
 #Research
 # http://www.ramdynamo.com/2014/03/google-gferdcr-url-mystery-revealed.html
+# https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h?q=aqs&sq=package:chromium&dr=C&l=181
+# https://gist.github.com/sshay77/4b1f6616a7afabc1ce2a
 
 
 # Old VED/New VED - https://deedpolloffice.com/blog/articles/decoding-ved-parameter
@@ -139,6 +144,7 @@ sub parse_URL($){
 		
 		$parameters{$u} = parse_EI($parameters{$u}) if ($u eq "ei");
 		$parameters{$u} = parse_GFE_RD($parameters{$u}) if ($u eq "gfe_rd");
+		$parameters{$u} = parse_GWS_RD($parameters{$u}) if ($u eq "gws_rd");
 		$parameters{$u} = parse_GFNS($parameters{$u}) if ($u eq "gfns");
 		$parameters{$u} = parse_PSI($parameters{$u}) if ($u eq "psi");
 		$parameters{$u} = parse_Start($parameters{$u}) if ($u eq "start");
@@ -146,9 +152,16 @@ sub parse_URL($){
 		$parameters{$u} = parse_safe($parameters{$u}) if ($u eq "safe");
 		$parameters{$u} = parse_ust($parameters{$u}) if ($u eq "ust");
 		$parameters{$u} = parse_VED($parameters{$u}) if ($u eq "ved");
+		$parameters{$u} = parse_sourceid($parameters{$u}) if ($u eq "sourceid");
+		$parameters{$u} = parse_aqs($parameters{$u}) if ($u eq "aqs");
+		$parameters{$u} = parse_rlz($parameters{$u}) if ($u eq "rlz");	
+		$parameters{$u} = parse_tbm($parameters{$u}) if ($u eq "tbm");	
+		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
+		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Width)" if ($u eq "biw");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");
-		$parameters{$u} .= "\t\t(Original Query)" if ($u eq "oq");
-		$parameters{$u} .= "\t\t(Searched Query)" if ($u eq "q");
+		$parameters{$u} .= "\t\t\t\t(Original Query)" if ($u eq "oq");
+		$parameters{$u} .= "\t\t\t\t(Query that Search results are returned for)" if ($u eq "q");
+		$parameters{$u} .= "\t\t\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Usually indicates that this was opened in a new tab/window from the Search Results page)" if ($u eq "url");
 		
 		print "$u=$parameters{$u}\n";
@@ -204,17 +217,76 @@ sub parse_EI($){
 sub parse_GFE_RD($){
 	my $gfe_rd = shift;
 	if ($gfe_rd eq "cr"){
-		return "$gfe_rd\t\t(Country Redirect - Direct to your countries Google homepage)"
+		return "$gfe_rd\t\t\t\t(Country Redirect - Direct to your countries Google homepage)"
 	}
 	return $gfe_rd;
 }
 
+# Go to google.com - redirect to .com.au and no gws_RD
+# go to google.com.au - no EI or gfe_rd, but gws_rd
+# go to https://www.google.com.au - no parameters, just search term
+sub parse_GWS_RD($){
+	my $gws_rd = shift;
+	if ($gws_rd eq "ssl"){
+		return "$gws_rd\t\t\t\t(Redirect to SSL site)";
+	}
+	return $gws_rd;
+}
+
+
+
 sub parse_GFNS($){
 	my $gfns = shift;
 	if ($gfns eq "1"){
-		return "$gfns\t\t(I'm feeling lucky - first organic result will be accessed)"
+		return "$gfns\t\t\t\t(I'm feeling lucky - first organic result will be accessed)"
+	}
+	return $gfns;
+}
+
+sub parse_sourceid($){
+	my $sourceid = shift;
+	if ($sourceid eq "chrome"){
+		return "$sourceid\t\t\t\t(Google Chrome)"
 	}
 }
+
+
+# http://superuser.com/questions/653295/what-is-the-aqs-parameter-in-google-search-query
+# Confirmed that the third parameter within this parameter (split by .'s) is number of milliseconds from initial keypress - if it exists
+# so far can get this value when typing in chrome, but not in google search box on homepage
+# aqs stands for Assisted query stats 
+# https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h
+sub parse_aqs($){
+	my $aqs = shift;
+	my @args = split /\./, $aqs;
+	
+	if (exists $args[3]){
+		(my $time, my @other) = split /j/, $args[3];
+		return $aqs."\t\t($time milliseconds from first keypress to search. Other parameters unknown)";
+	}
+	
+	return $aqs;
+}
+
+#https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
+# language and encoding information
+sub parse_rlz($){
+	my $rlz = shift;
+	return $rlz;
+}
+
+# Search engine type
+sub parse_tbm($){
+	my $tbm = shift;
+	return "$tbm\t\t(Image Search}" if ($tbm eq "isch");
+	return "$tbm\t\t(Video Search}" if ($tbm eq "vid");
+	return "$tbm\t\t(News Search}" if ($tbm eq "nws");
+	return "$tbm\t\t(Books Search}" if ($tbm eq "books");
+	return "$tbm\t\t(Shopping Search}" if ($tbm eq "shopping");
+	return $tbm;
+}
+
+
 
 sub parse_Start($){
 # Determines page that the search is on
