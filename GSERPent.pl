@@ -481,8 +481,8 @@ sub printDivider{
 
 sub _help {
 	print<< "EOT";
-googleURLParser v.$VERSION - Google URL Parser
-googleURLParser [-u url] [-f file] [-h]
+GSERPent v.$VERSION - Google URL Parser
+GSERPent [-u url] [-f file] [-h]
 Parses Google Search and Redirect URLs to provide additional data
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
