@@ -18,6 +18,7 @@
 #
 # 20170105  - updated GWS_RD, added client, formatting, sig2
 #			- added stubs for cad, esrc, rct, sa, uact, usg, web
+# 20170107  - add data to source parsing
 #
 #
 #To Install
@@ -108,7 +109,7 @@ sub parse_URL($){
 	my %parameters = {};
 	my $url = shift;
 	
-	
+	#remove http
 	$url =~ s/^http[s]:\/\///g if ($url =~ m/^http[s]:\/\//);
 	
 	# $url =~ s/^https\:\/\/[w*\.]google\..*\/(a-z*)\?//;
@@ -116,8 +117,11 @@ sub parse_URL($){
 	my ($google, @rest) = split /\//, $url;
 	$url = join('\/', @rest);
 	$url =~ s/\\\//\//g;
-		
-	$url =~ s/\?/\n/g;
+	
+	# need to add code to remove the part between google.*/(.*)?parameters
+	# the .* is optional, but my provide additional information
+			
+	#$url =~ s/\?/\n/g;
 	$url =~ s/\&/\n/g;
 	
 	# If a hash exists in the URL then the previous search was before the hash and the current search was in the q after the hash
@@ -246,6 +250,9 @@ sub parse_GFE_RD($){
 
 sub parse_q($){
 	my $q = shift;
+	# when clicking on links to youtube subscribed videos in gmail the url is parsed uri encoded in a q= parameter
+	# Theres no real harm in unescaping multiple times? I guess unless someone searches using %'s, further testing required
+	$q = uri_unescape($q); 
 	return "$q\t\t(Query not passed to search URL)" if ($q eq "");
 	return "$q\t\t(Query that Search results are returned for)";
 
@@ -380,7 +387,11 @@ sub parse_usg($){
 }
 
 # so far have only seen source = web - havent tested on mobile
+# seen gmail when clicking a youtube subscription link from gmail
 sub parse_source($){
+	my $source = shift;
+	return "$source\t\t(Web - standard browser search)" if ($source eq "web");
+	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
 }
 
 
