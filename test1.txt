@@ -1,0 +1,15 @@
+# test to compare parameters
+# I opened google chrome (signed in). Did a search straight from the address bar for superman
+# I change the tab to images and saved the url
+# I then added a 2 to the end of superman and performed the search
+# I then opened a new tab, searched for superman 2 and saved the url
+# I changed the tab to image search and saved the url
+# I then searched again for superman in a new tab and change the page to image search and saved the URL
+# Clicked on fourth image and saved the link from visit page
+
+https://www.google.com.au/search?q=superman&safe=off&espv=2&source=lnms&tbm=isch&sa=X&ved=0ahUKEwj6iJaD467RAhVStJQKHbGDA1kQ_AUICCgB&biw=1366&bih=671 | search from google chrome url bar (signed in) for superman
+https://www.google.com.au/search?safe=off&espv=2&biw=1366&bih=671&tbm=isch&sa=1&q=superman+2&oq=superman+2&gs_l=img.3..0l10.18312.18779.0.18990.2.2.0.0.0.0.201.399.0j1j1.2.0....0...1c.1.64.img..0.2.398...0i67k1.6N5zxlqhJ5A | search in search box from previous search for superman 2 (added 2)
+https://www.google.com.au/search?q=superman+2&oq=superman+2&aqs=chrome.0.69i59j69i60l2j69i61.999j0j4&sourceid=chrome&ie=UTF-8 | new tab search for superman 2
+https://www.google.com.au/search?q=superman+2&safe=off&source=lnms&tbm=isch&sa=X&ved=0ahUKEwjiraKZ467RAhUEI5QKHfsaATMQ_AUICCgB&biw=1366&bih=671 | change to image search
+https://www.google.com.au/search?q=superman&safe=off&source=lnms&tbm=isch&sa=X&ved=0ahUKEwie2ri6467RAhWBxZQKHUehAogQ_AUICCgB&biw=1366&bih=671 | new tab search for superman, change to image search
+https://www.google.com.au/url?sa=i&rct=j&q=&esrc=s&source=images&cd=&cad=rja&uact=8&ved=0ahUKEwjpkPW55K7RAhWEupQKHXPBCkkQjxwIAw&url=http%3A%2F%2Fwww.dccomics.com%2Fcharacters%2Fsuperman&psig=AFQjCNHamGIxXv_b0mZsUABU1kGBF-IBKw&ust=1483835322693616
