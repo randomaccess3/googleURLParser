@@ -15,14 +15,15 @@
 #			- add bih/biw parameter
 #			- started rlz parameter
 #			- added tbm
-#
 # 20170105  - updated GWS_RD, added client, formatting, sig2
 #			- added stubs for cad, esrc, rct, sa, uact, usg, web
 # 20170107  - add data to source parsing
-#
+# 20170109  - fixed bug with regards to the ? seperator, added stub for psig2, added additional source data
+#			- added table output (more work required)
 #
 #To Install
 # ppm install URI (which I think comes with perl now)
+# ppm install Text-ASCIITable
 # requires python 2.7 installed to run the EI parser
 # Automatically downloads the python EI parser if its not detected
 
@@ -57,11 +58,13 @@ use strict;
 use Getopt::Long;
 use File::Spec;
 
+use Text::ASCIITable;
+
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(url|u=s file|f=s help|?|h));
+GetOptions(\%config,qw(url|u=s file|f=s table|t help|?|h));
 
-my $VERSION = "20161226";
+my $VERSION = "20170109";
 my @alerts = ();
 
 if ($config{help} || !%config) {
@@ -113,21 +116,26 @@ sub parse_URL($){
 	$url =~ s/^http[s]:\/\///g if ($url =~ m/^http[s]:\/\//);
 	
 	# $url =~ s/^https\:\/\/[w*\.]google\..*\/(a-z*)\?//;
-	#remove http://www.google.com.*/.*?
+	#remove http://www.google.com.*/
 	my ($google, @rest) = split /\//, $url;
 	$url = join('\/', @rest);
 	$url =~ s/\\\//\//g;
-	
+		
 	# need to add code to remove the part between google.*/(.*)?parameters
 	# the .* is optional, but my provide additional information
-			
-	#$url =~ s/\?/\n/g;
+	
+	#extract the term between google.com/___?
+	$url =~ s/(.*)\?//g;
+	push @alerts, "Redirect link, usually indicating opening in new tab/window" if ($1 eq "url");
+	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($1 eq "imgres");
+	
+	
 	$url =~ s/\&/\n/g;
 	
 	# If a hash exists in the URL then the previous search was before the hash and the current search was in the q after the hash
-	if ($url =~ m/#/){
-			push @alerts, "# indicates second search - not implemented currently";
-	} 
+	push @alerts, "# indicates second search - not implemented currently" if ($url =~ m/#/);
+	
+	
 	
 	$url =~ s/\#/\n/g;
 	
@@ -175,6 +183,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_rlz($parameters{$u}) if ($u eq "rlz");	
 		$parameters{$u} = parse_tbm($parameters{$u}) if ($u eq "tbm");	
 		$parameters{$u} = parse_client($parameters{$u}) if ($u eq "client");
+		$parameters{$u} = parse_sclient($parameters{$u}) if ($u eq "sclient");
 		$parameters{$u} = parse_q($parameters{$u}) if ($u eq "q");	
 		$parameters{$u} = parse_cad($parameters{$u}) if ($u eq "cad");	
 		$parameters{$u} = parse_esrc($parameters{$u}) if ($u eq "esrc");	
@@ -183,22 +192,39 @@ sub parse_URL($){
 		$parameters{$u} = parse_sa($parameters{$u}) if ($u eq "sa");
 		$parameters{$u} = parse_usg($parameters{$u}) if ($u eq "usg");		
 		$parameters{$u} = parse_source($parameters{$u}) if ($u eq "source");		
+		$parameters{$u} = parse_psig($parameters{$u}) if ($u eq "psig");
+		$parameters{$u} = parse_gs_l($parameters{$u}) if ($u eq "gs_l");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
-		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
-		$parameters{$u} .= "\t\t\t\t(Screen Resolution - Width)" if ($u eq "biw");
+		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
+		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");
-		$parameters{$u} .= "\t\t\t\t(Original Query)" if ($u eq "oq");
-		$parameters{$u} .= "\t\t\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
-		$parameters{$u} .= "\t\t\t\t(Output Encoding)" if ($u eq "oe");   #joostdevalk.nl - google websearch parameters
+		$parameters{$u} .= "\t\t\(Original Query)" if ($u eq "oq");
+		$parameters{$u} .= "\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
+		$parameters{$u} .= "\t\t(Output Encoding)" if ($u eq "oe");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Usually indicates that this was opened in a new tab/window from the Search Results page)" if ($u eq "url");
 		
-		print "$u=$parameters{$u}\n";
+		print "$u=$parameters{$u}\n" if (!$config{table});
 		
 	}
-
+	
 	#printDivider();
 	#print scalar(@alerts)."\n";
 	#printDivider();
+
+	if ($config{table}){
+		my $t = Text::ASCIITable->new();
+		$t->setCols('Parameter','Value','Comment');
+	
+		#load new hash and move the key from name, value+comment, to name+value, comment
+		my $param_name;
+		foreach $param_name (sort keys %parameters){
+			next if (!defined($parameters{$param_name}));	
+			$parameters{$param_name} =~ s/\t\t/\t/g; #replace the double tab with a single tab
+			my ($param_value, $param_comment) = split /\t/, $parameters{$param_name}; #split the parameter value with the comment
+			$t->addRow($param_name,$param_value,$param_comment);
+		}
+		print $t;
+	}
 	
 	if (scalar(@alerts) > 1) {
 		printDivider();
@@ -244,7 +270,7 @@ sub parse_EI($){
 
 sub parse_GFE_RD($){
 	my $gfe_rd = shift;
-	return "$gfe_rd\t\t\t\t(Country Redirect - Direct to your countries Google homepage)" if ($gfe_rd eq "cr");
+	return "$gfe_rd\t\t(Country Redirect - Direct to your countries Google homepage)" if ($gfe_rd eq "cr");
 	return $gfe_rd;
 }
 
@@ -267,8 +293,8 @@ sub parse_q($){
 # Similar, except when searching from the URL bar you get the cr,ssl value
 sub parse_GWS_RD($){
 	my $gws_rd = shift;
-	return "$gws_rd\t\t\t\t(Redirect to SSL site)" if ($gws_rd eq "ssl");
-	return "$gws_rd\t\t\t\t(Country Redirect and Redirect to SSL site - so far only seen on IE)" if ($gws_rd eq "cr,ssl");
+	return "$gws_rd\t\t(Redirect to SSL site)" if ($gws_rd eq "ssl");
+	return "$gws_rd\t\t(Country Redirect and Redirect to SSL site - so far only seen on IE)" if ($gws_rd eq "cr,ssl");
 	return $gws_rd;
 }
 
@@ -276,21 +302,30 @@ sub parse_GWS_RD($){
 
 sub parse_GFNS($){
 	my $gfns = shift;
-	return "$gfns\t\t\t\t(I'm feeling lucky - first organic result will be accessed)" if ($gfns eq "1");
+	return "$gfns\t\t(I'm feeling lucky - first organic result will be accessed)" if ($gfns eq "1");
 	return $gfns;
 }
 
 sub parse_sourceid($){
 	my $sourceid = shift;
-	return "$sourceid\t\t\t\t(Google Chrome)" if ($sourceid eq "chrome");
+	return "$sourceid\t\t(Google Chrome)" if ($sourceid eq "chrome");
 }
 
 sub parse_client($){
 	my $client = shift;
-	return "$client\t\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
-	return "$client\t\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
+	return "$client\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
+	return "$client\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
 	return $client
 }
+
+# so far only seen on IE
+sub parse_sclient($){
+	my $sclient = shift;
+	return "$sclient\t\t(Internet Explorer)" if ($sclient eq "psy-ab");
+	return $sclient
+}
+
+
 
 
 # http://superuser.com/questions/653295/what-is-the-aqs-parameter-in-google-search-query
@@ -298,6 +333,8 @@ sub parse_client($){
 # so far can get this value when typing in chrome, but not in google search box on homepage
 # aqs stands for Assisted query stats 
 # https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h
+# From the looks of things this is Chrome only - it appears when you perform a search offline through the search bar. Doesn't appear in other browsers
+# HOST BASED PARAMETER
 sub parse_aqs($){
 	my $aqs = shift;
 	my @args = split /\./, $aqs;
@@ -368,31 +405,67 @@ sub parse_ust($){
 }
 
 
-sub parse_cad($){
-}
-
-sub parse_esrc($){
-}
-
-sub parse_rct($){
-}
-
-sub parse_sa($){
-}
-
-sub parse_uact($){
-}
-
-sub parse_usg($){
-}
-
 # so far have only seen source = web - havent tested on mobile
 # seen gmail when clicking a youtube subscription link from gmail
+# seen images when clicking on a "visit page" link in image search
 sub parse_source($){
 	my $source = shift;
 	return "$source\t\t(Web - standard browser search)" if ($source eq "web");
 	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
+	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
 }
+
+
+
+sub parse_cad($){
+	my $cad = shift;
+	return "$cad\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_esrc($){
+	my $esrc = shift;
+	return "$esrc\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_rct($){
+	my $rct = shift;
+	return "$rct\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_sa($){
+	my $sa = shift;
+	return "$sa\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_uact($){
+	my $uact = shift;
+	return "$uact\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_usg($){
+	my $usg = shift;
+	return "$usg\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_pbx($){
+	my $pbx = shift;
+	return "$pbx\t\t -- NOT YET IMPLEMENTED"; # if ($pbx eq "1");
+}
+
+sub parse_psig($){
+	my $psig = shift;
+	return "$psig\t\t -- NOT IMPLEMENTED";
+}
+
+# so far on chrome seen when searching from the google search box in image search but not if you search on google and then change to image search
+
+# seen when searching on IE using the google search box 
+sub parse_gs_l($){
+	my $gs_l = shift;
+	return "$gs_l\t\t -- NOT IMPLEMENTED";
+}
+
+
 
 
 
@@ -493,10 +566,11 @@ sub printDivider{
 sub _help {
 	print<< "EOT";
 GSERPent v.$VERSION - Google URL Parser
-GSERPent [-u url] [-f file] [-h]
+GSERPent [-u url] [-f file] [-h] [-t]
 Parses Google Search and Redirect URLs to provide additional data
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
+  -t|table ..........Table output
   -h.................Help
   
 Lists: Required format is URL|Comment. The comment will be included in the output
