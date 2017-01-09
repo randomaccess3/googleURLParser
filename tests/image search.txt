@@ -1,0 +1,5 @@
+# Image search
+# It's the same picture but different options selected
+# The VED is the only thing that's different (outside of the link)
+https://www.google.com.au/url?sa=i&rct=j&q=&esrc=s&source=images&cd=&ved=0ahUKEwi_p5LyyrPRAhUHlpQKHVrFBAAQjxwIAw&url=https%3A%2F%2Fenterprise.google.com%2Fsearch%2Fproducts%2Fgss.html&psig=AFQjCNFGIpYEFIr9QvFaLjSahpT75yLBQg&ust=1484000519706050 | click on an image and view image
+https://www.google.com.au/url?sa=i&rct=j&q=&esrc=s&source=images&cd=&ved=0ahUKEwimwobwzLPRAhVGNJQKHUvMCIgQjBwIBA&url=https%3A%2F%2Flh4.googleusercontent.com%2FenVZiSNpLcn_qa1u8iLJHT8NcxqE4TGuShfiKvgXuR6EmK_2bB3f5W4ptSI2HctW8byaK6WcZQ%3Ds640-h400-e365&psig=AFQjCNFGIpYEFIr9QvFaLjSahpT75yLBQg&ust=1484000519706050 | click on an image and visit page

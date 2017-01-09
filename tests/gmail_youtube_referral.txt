@@ -1,0 +1,10 @@
+# Referral link for a youtube video out of an email
+# May only apply to google properties
+# has a timestamp in it relating to when the user clicked on the link, run both queries and you can see the ust time is different
+# To test: is this timestamp a network time (most probably)
+
+# Additional testing suggests that this time may not always be accurate as to when the user clicked the link.
+# Also only works from the Youtube subscription links, not just sending a link to youtube to someone by pasting the URL
+
+https://www.google.com/url?hl=en&q=https://www.youtube.com/attribution_link?a%3Dxqp9jjcoVUI%26u%3D/watch?v%253DPfNgeZyALEo%2526feature%253Dem-subs_digest%26g%3D8VfO5Yf4rrki5n9NcmHK7WrVj6JqSxdMuN3pQWu-TnDQhuyUz18qfK6d8FeGe_sjkCUuryqdAnmLVG8RNx5a7cPPPZd4tm7WChdRhoJzoe9XNjKYAvxA3H1Th2OHY4eSAczHQsJvmbD2rBE79v9GsJuNppaACByR-xwx41YTPhYL6_2N6Szb&source=gmail&ust=1483051552954000&usg=AFQjCNGuKYYp2jwhDkADVQ8_T0hO-0Scrw
+https://www.google.com/url?hl=en&q=https://www.youtube.com/attribution_link?a%3Dxqp9jjcoVUI%26u%3D/watch?v%253DPfNgeZyALEo%2526feature%253Dem-subs_digest%26g%3D8VfO5Yf4rrki5n9NcmHK7WrVj6JqSxdMuN3pQWu-TnDQhuyUz18qfK6d8FeGe_sjkCUuryqdAnmLVG8RNx5a7cPPPZd4tm7WChdRhoJzoe9XNjKYAvxA3H1Th2OHY4eSAczHQsJvmbD2rBE79v9GsJuNppaACByR-xwx41YTPhYL6_2N6Szb&source=gmail&ust=1483063992207000&usg=AFQjCNGGetShTcCuVE80aStSkPoIK-_3Uw

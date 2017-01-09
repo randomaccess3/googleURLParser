@@ -1,0 +1,9 @@
+https://www.google.com.au/search?q=source%3Dlmns&ie=utf-8&oe=utf-8&client=firefox-b&gfe_rd=cr&ei=gV1tWN29F7PM8gep85CoDg | search from the firefox new tab
+https://www.google.com.au/search?q=source%3Dlmns&ie=utf-8&oe=utf-8&client=firefox-b&gfe_rd=cr&ei=aF5tWNqsJKzM8gf_-YBw | search from search box after initial search
+https://www.google.com.au/search?q=source%3Dlmns&ie=utf-8&oe=utf-8&client=firefox-b&gfe_rd=cr&ei=jF5tWPCsGazM8gf_-YBw | search from search box new window
+https://www.google.com.au/search?q=new+search&ie=utf-8&oe=utf-8&client=firefox-b-ab&gfe_rd=cr&ei=sF5tWP3vD6zM8gf_-YBw | new search (after initial search) in address bar
+
+
+#Additional testing on firefox - should provide different results but doesnt
+https://www.google.com.au/search?q=can+you+run+strings+from+encase+console&ie=utf-8&oe=utf-8&client=firefox-b&gfe_rd=cr&ei=0IVtWPK7EKjM8gfk8raoAg | Search with no +'s between words
+https://www.google.com.au/search?q=can%2Byou%2Brun%2Bstrings%2Bfrom%2Bencase%2Bconsole&ie=utf-8&oe=utf-8&client=firefox-b&gfe_rd=cr&ei=HYZtWOu4AajM8gfk8raoAg | search with +'s between words

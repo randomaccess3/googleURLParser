@@ -1,0 +1,14 @@
+#tests run on my mac (10.10) running latest available versions of safari, chrome and firefox
+#EI reliablely created by going to google homepage first
+https://www.google.com.au/?gfe_rd=cr&ei=RwxhWPvFLMnr8Aeih74g#q=incognito | go to google homepage in chrome incognito, search for incognito
+https://www.google.com.au/?gfe_rd=cr&ei=HAxhWKf2D8nr8Aeih74g&gws_rd=ssl#q=safari | go to google homepage in safari private, search for safari
+https://www.google.com.au/?gfe_rd=cr&ei=bAxhWLiOEqzu8wfg-bjAAQ#safe=off&q=google | go to google homepage in chrome (logged in), search for google
+https://www.google.com.au/search?client=safari&rls=en&q=safari+search+2&ie=UTF-8&oe=UTF-8&gfe_rd=cr&ei=fg1hWPjDAsTr8AeosajwCg | search from safari search bar for "Safari Search 2"
+https://www.google.com.au/?gfe_rd=cr&ei=0Q1hWJSiL8rr8AeX1axA&gws_rd=ssl#q=safari+search+3 | go to google homepage in safari (not logged in), search for "safari search 3"
+https://www.google.com.au/?gfe_rd=cr&ei=xQ5hWJLlGMfN8geVuJDIDA&gws_rd=ssl#q=firefox | go to google homepage in firefox (not logged in), search for firefox
+https://www.google.com.au/search?q=right+hand+search+box&ie=utf-8&oe=utf-8&gws_rd=cr&ei=AQ9hWPquN4er0QT6n4ugDw | open new window in firefox (not logged in), search in right hand search box
+https://www.google.com.au/search?q=suggested+meaning&ie=utf-8&oe=utf-8&gws_rd=cr&ei=KA9hWOjFLcXL0AT4_zw |  open new window in firefox (not logged in), start typing in right hand search box and click on one of the suggested links
+https://www.google.com.au/search?q=search+bar&oq=search+bar&aqs=chrome..69i57j69i60l3j69i65j69i60.1350j0j1&sourceid=chrome&ie=UTF-8 | search straight from chrome (logged in)
+https://www.google.com.au/search?q=search+bar&oq=search+bar&aqs=chrome..69i57j69i60l3j69i65j69i60.1350j0j1&sourceid=chrome&ie=UTF-8#q=search+bar&safe=off&start=10 | as above, but select second page
+https://www.google.com.au/url?sa=t&rct=j&q=&esrc=s&source=web&cd=11&cad=rja&uact=8&ved=0ahUKEwiSutT085HRAhUKi5QKHWtdDFo4ChAWCBgwAA&url=https%3A%2F%2Fcolorlib.com%2Fwp%2Ffree-css3-html5-search-form-examples%2F&usg=AFQjCNFNXqCOX9ebV4MQl86DLM0fGch5iw&sig2=NCcJlVx5-h76LRIM3qQJZQ&bvm=bv.142059868,d.dGo | right click on first link from above search and copy referred link
+https://www.google.com.au/url?sa=t&rct=j&q=&esrc=s&source=web&cd=12&cad=rja&uact=8&ved=0ahUKEwiSutT085HRAhUKi5QKHWtdDFo4ChAWCB8wAQ&url=http%3A%2F%2Fsevenspark.com%2Fdocs%2Fubermenu-3%2Fcontent%2Fshortcodes%2Fsearch&usg=AFQjCNEm_iqaW4lcVdC-Bg3KxqTb2ntvHA&sig2=KC_8oUeAsH5oi6qvtUIUVQ&bvm=bv.142059868,d.dGo | right click on first link from above search and copy referred link
