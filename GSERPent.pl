@@ -20,11 +20,14 @@
 # 20170107  - add data to source parsing
 # 20170109  - fixed bug with regards to the ? seperator, added stub for psig2, added additional source data
 #			- added table output (more work required)
-#
+#			- tbs, bvm stub, ion, updated some parameters with additional terms
+# 20170110  - espv stub, site, psi comments, gs_l comments, aqs comments
+#			- update client (android), sourceid (mobile)
+
 #To Install
 # ppm install URI (which I think comes with perl now)
 # ppm install Text-ASCIITable
-# requires python 2.7 installed to run the EI parser
+# requires python 2.7 installed to run the EI parser - https://raw.githubusercontent.com/cheeky4n6monkey/4n6-scripts/master/google-ei-time.py
 # Automatically downloads the python EI parser if its not detected
 
 
@@ -48,7 +51,7 @@
 #Original Query - If the original query is less than the q value then it's possible that the user has clicked on a suggested post - need more research on the topic
 
 
-my $ved_parser = "/Users/phill/Desktop/GoogleURLParser/protobuff/ved-decoder-master/ved.py";
+#my $ved_parser = "/Users/phill/Desktop/GoogleURLParser/protobuff/ved-decoder-master/ved.py";
 
 
 use Data::Dumper;
@@ -64,7 +67,7 @@ my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
 GetOptions(\%config,qw(url|u=s file|f=s table|t help|?|h));
 
-my $VERSION = "20170109";
+my $VERSION = "20170110";
 my @alerts = ();
 
 if ($config{help} || !%config) {
@@ -194,6 +197,12 @@ sub parse_URL($){
 		$parameters{$u} = parse_source($parameters{$u}) if ($u eq "source");		
 		$parameters{$u} = parse_psig($parameters{$u}) if ($u eq "psig");
 		$parameters{$u} = parse_gs_l($parameters{$u}) if ($u eq "gs_l");
+		$parameters{$u} = parse_tbs($parameters{$u}) if ($u eq "tbs");
+		$parameters{$u} = parse_bvm($parameters{$u}) if ($u eq "bvm");
+		$parameters{$u} = parse_site($parameters{$u}) if ($u eq "site");
+		$parameters{$u} = parse_ion($parameters{$u}) if ($u eq "ion");
+		$parameters{$u} = parse_espv($parameters{$u}) if ($u eq "espv");
+		$parameters{$u} = parse_site($parameters{$u}) if ($u eq "site");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
@@ -237,6 +246,9 @@ sub parse_URL($){
 	return;
 }
 
+# found when examining the cache files. so far seen on chrome havent tested anything else
+# it seems that the two timestamps are different but not sure why
+# may relate to multiple searches in the same session
 sub parse_PSI($){
 	my $psi = shift;
 	my ($ei, $unix, $unknown) = split /\./, $psi;
@@ -309,28 +321,38 @@ sub parse_GFNS($){
 sub parse_sourceid($){
 	my $sourceid = shift;
 	return "$sourceid\t\t(Google Chrome)" if ($sourceid eq "chrome");
+	return "$sourceid\t\t(Google Chrome - Instant Enabled)" if ($sourceid eq "chrome-instant");
+	return "$sourceid\t\t(Google Chrome - unsure)" if ($sourceid eq "chrome-psyapi2");
+	return "$sourceid\t\t(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
 }
 
 sub parse_client($){
 	my $client = shift;
 	return "$client\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
 	return "$client\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
+	return "$client\t\t(Chrome for Android)" if ($client eq "ms-android-google");
 	return $client
 }
 
-# so far only seen on IE
+# unsure what it means, seen on chrome and ie so far
 sub parse_sclient($){
 	my $sclient = shift;
-	return "$sclient\t\t(Internet Explorer)" if ($sclient eq "psy-ab");
+	return "$sclient\t\t(seen, not sure)" if ($sclient eq "psy-ab");
 	return $sclient
 }
 
-
+# seen chrome, blank when search from google homepage
+sub parse_site($){
+	my $site = shift;
+	return "$site\t\tseen --NOT IMPLEMENTED" if ($site eq "");
+	return $site;
+}
 
 
 # http://superuser.com/questions/653295/what-is-the-aqs-parameter-in-google-search-query
 # Confirmed that the third parameter within this parameter (split by .'s) is number of milliseconds from initial keypress - if it exists
 # so far can get this value when typing in chrome, but not in google search box on homepage
+# Therefore if aqs is identified it would only relate to the q or oq values prior to the #
 # aqs stands for Assisted query stats 
 # https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h
 # From the looks of things this is Chrome only - it appears when you perform a search offline through the search bar. Doesn't appear in other browsers
@@ -385,7 +407,7 @@ sub parse_pws($){
 sub parse_safe($){
 	my $safe = shift;
 	return "$safe\t\t(Safe search off)" if ($safe eq "off");
-	return "$safe\t\t(Safe search on)" if ($safe eq "on");
+	return "$safe\t\t(Safe search on)" if ($safe eq "active");
 }
 
 
@@ -408,23 +430,89 @@ sub parse_ust($){
 # so far have only seen source = web - havent tested on mobile
 # seen gmail when clicking a youtube subscription link from gmail
 # seen images when clicking on a "visit page" link in image search
+# did a search and changed the returned results from date A to date B, saw source=lnt
+# sometimes I see source=hp not sure why
 sub parse_source($){
 	my $source = shift;
 	return "$source\t\t(Web - standard browser search)" if ($source eq "web");
 	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
 	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
+	return "$source\t\t(seen - Unknown)" if ($source eq "lnt");
+	return "$source\t\t(seen - Unknown)" if ($source eq "hp");
+	
+	return "$source\t\t(Unknown)";
 }
 
 
+# Ex: tbs=qdr:h,ctr:countryAU&cr=countryAU - past hour in australia
+# qdr - h (hour) d (day) m (month) y (year) w (week) 
+# tbs=qdr:w,sbd:1 - past week sort by date
+# qdr:d - past day
+# Ex: tbs=li:1   - verbatim
+# Ex: ctr:countryAU&cr=countryAU - just australia
+
+#tbs=cdr%3A1%2Ccd_min%3A1%2F01%2F2017%2Ccd_max%3A7%2F01%2F2017 - cdr:1,cd_min:1/01/2017,cd_max:7/01/2017 - selected time period (this is uri encoded)
+
+# Verbatim results appears to remove other tbs parameters
+# Options from the Tools drop down menu
+sub parse_tbs($){
+	my $tbs = shift;
+	my @vals = split /,/, $tbs;
+
+	return ($tbs .= "\t\t(Filter by a specific time period)") if ($tbs  =~ m/cdr:1/);
+	
+	$tbs .= "\t\t";
+	foreach my $v (@vals){
+		#print "v - $v\n";
+		if ($v eq "qdr:h"){
+			$tbs .= "(Results from the last hour)";
+		}
+		elsif ($v eq "qdr:d"){
+			$tbs .= "(Results from the last 24 hours)";
+		}
+		elsif ($v eq "qdr:w"){
+			$tbs .= "(Results from the last week)" ;
+		}
+		elsif ($v eq "qdr:m"){
+			$tbs .= "(Results from the last month)" ;
+		}
+		elsif ($v eq "qdr:y"){
+			$tbs .= "(Results from the last year)";
+		}
+		elsif ($v eq "li:1"){
+			$tbs .= "(Verbatim results - rather than All results)" 
+		}
+		elsif ($v eq "sbd:1"){
+			$tbs .= "(Sort by Date)";
+		}
+		elsif ($v =~ m/ctr:country(..)/){
+			$tbs .= "(Country: $1)" ;
+		}
+	}
+	
+	$tbs =~ s/\)\(/, /g;
+	return "$tbs";
+}
 
 sub parse_cad($){
 	my $cad = shift;
 	return "$cad\t\t -- NOT IMPLEMENTED";
 }
 
+# seen 2 so far
+sub parse_espv($){
+	my $espv = shift;
+	return "$espv\t\t seen -- NOT IMPLEMENTED" if ($espv eq "2");
+	return "$espv\t\t -- NOT IMPLEMENTED";
+}
+
+
+# http://www.wordstream.com/blog/ws/2012/02/24/keyword-not-provided-esrc
+# above link explains that esrc=s may indicate query withheld.
 sub parse_esrc($){
 	my $esrc = shift;
-	return "$esrc\t\t -- NOT IMPLEMENTED";
+	return "$esrc\t\t (May relate to keyword not provided)" if ($esrc eq "s");
+	return "$esrc\t\t -- UNKNOWN";
 }
 
 sub parse_rct($){
@@ -432,14 +520,30 @@ sub parse_rct($){
 	return "$rct\t\t -- NOT IMPLEMENTED";
 }
 
+# X - unsure what it means
+# t - unsure - seen on edge
 sub parse_sa($){
 	my $sa = shift;
-	return "$sa\t\t -- NOT IMPLEMENTED";
+	return "$sa\t\t seen but -- NOT IMPLEMENTED" if ($sa eq "X");
+	return "$sa\t\t seen but -- NOT IMPLEMENTED" if ($sa eq "t");	
+	return "$sa\t\t unknown -- NOT IMPLEMENTED";
 }
 
 sub parse_uact($){
 	my $uact = shift;
 	return "$uact\t\t -- NOT IMPLEMENTED";
+}
+
+# iniital testing on chrome, logged in, shows ion means instant is turned on. but that doesn't mean it works if the computer/internet connection ? isnt fast enough
+sub parse_ion($){
+	my $ion = shift;
+	return "$ion\t\t -- Inital Testing indicated this means that Instant is on" if ($ion eq "1");
+	return "$ion\t\t -- not implemented yet"
+}
+
+sub parse_site($){
+	my $site = shift;
+	return "$site\t\t -- NOT IMPLEMENTED";
 }
 
 sub parse_usg($){
@@ -457,9 +561,22 @@ sub parse_psig($){
 	return "$psig\t\t -- NOT IMPLEMENTED";
 }
 
+
+sub parse_bav($){
+	my $bav = shift;
+	return "$bav\t\t -- NOT IMPLEMENTED";
+}
+
+sub parse_bvm($){
+	my $bvm = shift;
+	return "$bvm\t\t -- NOT IMPLEMENTED";
+}
+
+
 # so far on chrome seen when searching from the google search box in image search but not if you search on google and then change to image search
 
-# seen when searching on IE using the google search box 
+# seen when searching using the google search box 
+# may indicate location
 sub parse_gs_l($){
 	my $gs_l = shift;
 	return "$gs_l\t\t -- NOT IMPLEMENTED";
@@ -483,14 +600,13 @@ sub parse_gs_l($){
 #Ved parser by https://github.com/beschulz/ved-decoder
 sub parse_VED($){
 	my $ved = shift;
-	my $parsed = "";
 	# print "ved = $ved\n";
 	# my $command = "echo $ved > temp1";
 	# system (qq{$command});
 	# $command = "cat temp | $ved_parser"; 
 	# system (qq{$command});
 	# print "VED: ". readTemp("temp1")."\n\n\n\n";
-	return $ved;
+	return $ved."\t\t -- not implemented\n";
 }
 
 
@@ -549,14 +665,14 @@ sub readTemp($){
 }
 
 sub printEqDivider{
-	my $n = 150;
+	my $n = 100;
 	my $character = '=';
 	my $text =~ s/^(.*)/$character x $n . $1/mge;
 	print $text."\n";
 }
 
 sub printDivider{
-	my $n = 150;
+	my $n = 100;
 	my $character = '-';
 	my $text =~ s/^(.*)/$character x $n . $1/mge;
 	print $text."\n";
