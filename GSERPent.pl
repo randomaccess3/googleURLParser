@@ -25,7 +25,7 @@
 #			- update client (android), sourceid (mobile)
 # 20170111  - add OS X install instructions
 #			- add option to just show provided parameter
-#			- started gs_l
+#			- started gs_l, added cr value
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -136,7 +136,7 @@ sub parse_URL($){
 	
 	#extract the term between google.com/___?
 	$url =~ s/(.*)\?//g;
-	push @alerts, "Redirect link, usually indicating opening in new tab/window" if ($1 eq "url");
+	push @alerts, "Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($1 eq "url");
 	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($1 eq "imgres");
 	
 	
@@ -211,6 +211,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_site($parameters{$u}) if ($u eq "site");
 		$parameters{$u} = parse_ion($parameters{$u}) if ($u eq "ion");
 		$parameters{$u} = parse_espv($parameters{$u}) if ($u eq "espv");
+		$parameters{$u} = parse_cr($parameters{$u}) if ($u eq "cr");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
@@ -231,7 +232,10 @@ sub parse_URL($){
 	if ($config{table}){
 		my $t = Text::ASCIITable->new();
 		$t->setCols('Parameter','Value','Comment');
-	
+		$t->alignCol('Parameter','left');
+		$t->alignCol('Value','left');
+		$t->alignCol('Comment','left');
+		
 		#load new hash and move the key from name, value+comment, to name+value, comment
 		my $param_name;
 		foreach $param_name (sort keys %parameters){
@@ -413,6 +417,10 @@ sub parse_pws($){
 	return "$pws\t\t(Show all results)" if ($pws eq "1");
 }
 
+
+# saw strict when I had it activated in the options whilst logged in, haven't seen it otherwise
+# off and active are more likely when you change it for the particular session using the dropdown menu
+# further testing required
 sub parse_safe($){
 	my $safe = shift;
 	return "$safe\t\t(Safe search off)" if ($safe eq "off");
@@ -504,12 +512,28 @@ sub parse_tbs($){
 	return "$tbs";
 }
 
-sub parse_cad($){
-	my $cad = shift;
-	return "$cad\t\t -- NOT IMPLEMENTED";
+#show results for a specific country
+#could include lookup for each country
+# list is probably here: https://developers.google.com/adwords/api/docs/appendix/geotargeting
+sub parse_cr($){
+	my $cr = shift;
+	
+	return "$cr\t\tEmpty" if ($cr eq "");
+	
+	$cr =~ s/Country(..)//g;	
+	return	"Country$1 (Country: $1)" ; 
 }
 
-# seen 2 so far
+
+#seen values - 
+# rja - unsure
+sub parse_cad($){
+	my $cad = shift;
+	return "$cad\t\tseen unsure -- NOT IMPLEMENTED" if ($cad eq "rja");
+	return "$cad\t\t-- NOT IMPLEMENTED";
+}
+
+# seen value 2 so far
 sub parse_espv($){
 	my $espv = shift;
 	return "$espv\t\t seen -- NOT IMPLEMENTED" if ($espv eq "2");
@@ -521,22 +545,26 @@ sub parse_espv($){
 # above link explains that esrc=s may indicate query withheld.
 sub parse_esrc($){
 	my $esrc = shift;
-	return "$esrc\t\t (May relate to keyword not provided)" if ($esrc eq "s");
+	return "$esrc\t\t(May relate to keyword not provided)" if ($esrc eq "s");
 	return "$esrc\t\t -- UNKNOWN";
 }
 
+
+# seen values 
+# j - unsure
 sub parse_rct($){
 	my $rct = shift;
-	return "$rct\t\t -- NOT IMPLEMENTED";
+	return "$rct\t\tseen-- NOT IMPLEMENTED" if ($rct eq "j");
+	return "$rct\t\t-- NOT IMPLEMENTED";
 }
 
 # X - unsure what it means
 # t - unsure - seen on edge
 sub parse_sa($){
 	my $sa = shift;
-	return "$sa\t\t seen but -- NOT IMPLEMENTED" if ($sa eq "X");
-	return "$sa\t\t seen but -- NOT IMPLEMENTED" if ($sa eq "t");	
-	return "$sa\t\t unknown -- NOT IMPLEMENTED";
+	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "X");
+	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "t");	
+	return "$sa\t\tunknown -- NOT IMPLEMENTED";
 }
 
 sub parse_uact($){
@@ -583,6 +611,9 @@ sub parse_bvm($){
 
 # seen when searching using the google search box 
 # contains information about the users search
+
+
+# further testing required for characters typed and deleted
 sub parse_gs_l($){
 	my $gs_l = shift;
 	my @vals = split /\./, $gs_l;
@@ -594,10 +625,8 @@ sub parse_gs_l($){
 	
 	$comment .= "(".ordinal($vals[2]+1). " entry selected)" if ($vals[2]);	
 	
-    $comment .= "(".$vals[8]." characters typed" if ($vals[8]);   
-    $comment .= "(".$vals[8]." characters deleted" if ($vals[10]);	
-#gs_l=serp.1.6.*
-	
+    $comment .= "(May indicate - ".$vals[8]." characters typed" if ($vals[8]);   
+    $comment .= "(May indicate - ".$vals[8]." characters deleted" if ($vals[10]);		
 	
 	#$comment .= ")";
 	$comment =~ s/\)\(/, /g;
