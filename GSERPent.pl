@@ -24,6 +24,8 @@
 # 20170110  - espv stub, site, psi comments, gs_l comments, aqs comments
 #			- update client (android), sourceid (mobile)
 # 20170111  - add OS X install instructions
+#			- add option to just show provided parameter
+#			- started gs_l
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -66,9 +68,11 @@ use File::Spec;
 
 use Text::ASCIITable;
 
+
+
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(url|u=s file|f=s table|t help|?|h));
+GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t help|?|h));
 
 my $VERSION = "20170110";
 my @alerts = ();
@@ -163,7 +167,7 @@ sub parse_URL($){
 	
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
-			push @alerts, "Either additional search, or suggested search was suggested from search bar (tested on chrome)";
+			push @alerts, "Either additional search, or suggested search was selected from search bar (tested on chrome)";
 	} 
 	
 	foreach $u (sort keys %parameters){
@@ -171,7 +175,9 @@ sub parse_URL($){
 		#Unsure why the hash has a HASH -> undef entry in it, this line skips it
 		next if (!defined($parameters{$u}));
 		
-		
+		# If -p option used then skip if the current parameter doesn't match provided parameter
+		next if ($config{param} && $config{param} ne $u);
+		 
 		# Sends the parameter value to the subroutine for parsing
 		# result is returned and printed on a new line with the parameter name
 		$parameters{$u} = parse_EI($parameters{$u}) if ($u eq "ei");
@@ -205,7 +211,6 @@ sub parse_URL($){
 		$parameters{$u} = parse_site($parameters{$u}) if ($u eq "site");
 		$parameters{$u} = parse_ion($parameters{$u}) if ($u eq "ion");
 		$parameters{$u} = parse_espv($parameters{$u}) if ($u eq "espv");
-		$parameters{$u} = parse_site($parameters{$u}) if ($u eq "site");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
@@ -222,7 +227,7 @@ sub parse_URL($){
 	#printDivider();
 	#print scalar(@alerts)."\n";
 	#printDivider();
-
+	
 	if ($config{table}){
 		my $t = Text::ASCIITable->new();
 		$t->setCols('Parameter','Value','Comment');
@@ -261,6 +266,7 @@ sub parse_PSI($){
 	system (qq{$command});
 	$ei = readTemp("temp")." UTC";
 	system (qq{del temp});
+	system (qq{rm temp});
 	
 	#$unix last three digits removed to make it a unix timestamp. Should match the EI timestamp
 	$unix = substr($unix, 0, -3);
@@ -411,6 +417,7 @@ sub parse_safe($){
 	my $safe = shift;
 	return "$safe\t\t(Safe search off)" if ($safe eq "off");
 	return "$safe\t\t(Safe search on)" if ($safe eq "active");
+	return "$safe\t\t(Safe search on)" if ($safe eq "strict");
 }
 
 
@@ -544,10 +551,6 @@ sub parse_ion($){
 	return "$ion\t\t -- not implemented yet"
 }
 
-sub parse_site($){
-	my $site = shift;
-	return "$site\t\t -- NOT IMPLEMENTED";
-}
 
 sub parse_usg($){
 	my $usg = shift;
@@ -579,10 +582,26 @@ sub parse_bvm($){
 # so far on chrome seen when searching from the google search box in image search but not if you search on google and then change to image search
 
 # seen when searching using the google search box 
-# may indicate location
+# contains information about the users search
 sub parse_gs_l($){
 	my $gs_l = shift;
-	return "$gs_l\t\t -- NOT IMPLEMENTED";
+	my @vals = split /\./, $gs_l;
+	my $comment = "";
+	
+	$comment .= "(mouse-click on suggestion)" if ($vals[1] eq "1");
+	$comment .= "(keyboard [enter] key)" if ($vals[1] eq "3");
+	$comment .= "(Google Instant Search)" if ($vals[1] eq "10");
+	
+	$comment .= "(".ordinal($vals[2]+1). " entry selected)" if ($vals[2]);	
+	
+    $comment .= "(".$vals[8]." characters typed" if ($vals[8]);   
+    $comment .= "(".$vals[8]." characters deleted" if ($vals[10]);	
+#gs_l=serp.1.6.*
+	
+	
+	#$comment .= ")";
+	$comment =~ s/\)\(/, /g;
+	return $gs_l."\t\t". $comment. "-- IN PROGRESS";
 }
 
 
@@ -597,8 +616,7 @@ sub parse_gs_l($){
 
 
 
-
-
+#https://deedpolloffice.com/blog/articles/decoding-ved-parameter
 
 #Ved parser by https://github.com/beschulz/ved-decoder
 sub parse_VED($){
@@ -615,43 +633,6 @@ sub parse_VED($){
 
 
 
-#https://deedpolloffice.com/blog/articles/decoding-ved-parameter
-#     // Copyright 2013 Deed Poll Office Ltd, UK <https://deedpolloffice.com>
-#    // Licensed under Apache Licence v2.0 <http://apache.org/licenses/LICENSE-2.0>
-
-#sub parse_VED($){
-#	my $ved = shift;
-#	my $parsed;
-	
-	#my %keys = (
- 	#	  	"t"  => "2",
-    #		"r" => "6",
-    #		"s"  => "7",
-    #		"i" => "1"
-	#);
-	#my $ret;
-
-	#if (substr($ved, 0, 1) == '1') {
-	 #       preg_match_all('/([a-z]+):([0-9]+)/i', $ved, $matches, PREG_SET_ORDER);
- #       foreach ($matches as $m)
-#	    $ret[isset($keys[$m[1]]) ? $keys[$m[1]] : $m[1]] = (int) $m[2];
-	#	return "$ved\t\tPlain Text Encoded";
-    #}
-    #if (substr($ved, 0, 1) == '0') {
-	#	return "$ved\t\tProtobuff Encoded";
-    #}
-
- #   preg_match_all('/([\x80-\xff]*[\0-\x7f])([\x80-\xff]*[\0-\x7f])/',
-#	base64_decode(str_replace(array('_','-'), array('+','/'), substr($ved, 1))),
-#	$matches, PREG_SET_ORDER);
-#    foreach ($matches as $m) {
-#	$key = $val = 0;
-#	foreach (str_split($m[1]) as $i => $c) $key += (ord($c) & 0x7f) << $i * 7;
-#	foreach (str_split($m[2]) as $i => $c) $val += (ord($c) & 0x7f) << $i * 7;
-#	$ret[$key >> 3] = $val;
-#    }
-#    return $ret;
-#}
 
 
 sub readTemp($){
@@ -681,14 +662,20 @@ sub printDivider{
 	print $text."\n";
 }
 
+#CPAN module - use Lingua::EN::Numbers::Ordinate;
+#http://stackoverflow.com/questions/11369907/how-do-i-retrieve-an-integers-ordinal-suffix-in-perl-like-st-nd-rd-th
+sub ordinal {
+  return $_.(qw/th st nd rd/)[/(?<!1)([123])$/ ? $1 : 0] for int shift;
+}
 
 sub _help {
 	print<< "EOT";
 GSERPent v.$VERSION - Google URL Parser
-GSERPent [-u url] [-f file] [-h] [-t]
+GSERPent [-u url] [-f file] [-p param] [-t] [-h]
 Parses Google Search and Redirect URLs to provide additional data
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
+  -p|param ..........Print only supplied parameter
   -t|table ..........Table output
   -h.................Help
   
