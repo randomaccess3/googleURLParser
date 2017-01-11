@@ -23,13 +23,16 @@
 #			- tbs, bvm stub, ion, updated some parameters with additional terms
 # 20170110  - espv stub, site, psi comments, gs_l comments, aqs comments
 #			- update client (android), sourceid (mobile)
+# 20170111  - add OS X install instructions
 
-#To Install
+#To Install Windows
 # ppm install URI (which I think comes with perl now)
 # ppm install Text-ASCIITable
 # requires python 2.7 installed to run the EI parser - https://raw.githubusercontent.com/cheeky4n6monkey/4n6-scripts/master/google-ei-time.py
 # Automatically downloads the python EI parser if its not detected
 
+#To Install OS X
+# cpan Text::ASCIITable
 
 #To do ; put in download code for EI parser 
 # separate # from URL as it denotes a second search
