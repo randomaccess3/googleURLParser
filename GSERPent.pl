@@ -26,6 +26,10 @@
 # 20170111  - add OS X install instructions
 #			- add option to just show provided parameter
 #			- started gs_l, added cr value
+# 20170115  - added opera to client and sourceid
+#			- fixed bug in printing alerts, added additional decoding to aqs parameter
+#			- further research into gs_l
+#			- commented out rm temp to avoid errors on windows
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -75,7 +79,7 @@ Getopt::Long::Configure("prefix_pattern=(-|\/)");
 GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t help|?|h));
 
 my $VERSION = "20170110";
-my @alerts = ();
+our @alerts = ();
 
 if ($config{help} || !%config) {
 	_help();
@@ -118,7 +122,7 @@ else {
 }
 
 sub parse_URL($){
-	my @alerts = "";
+	#my @alerts = "";
 	my %parameters = {};
 	my $url = shift;
 	
@@ -189,6 +193,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_pws($parameters{$u}) if ($u eq "pws");
 		$parameters{$u} = parse_safe($parameters{$u}) if ($u eq "safe");
 		$parameters{$u} = parse_ust($parameters{$u}) if ($u eq "ust");
+		$parameters{$u} = parse_zx($parameters{$u}) if ($u eq "zx");
 		$parameters{$u} = parse_VED($parameters{$u}) if ($u eq "ved");
 		$parameters{$u} = parse_sourceid($parameters{$u}) if ($u eq "sourceid");
 		$parameters{$u} = parse_aqs($parameters{$u}) if ($u eq "aqs");
@@ -247,9 +252,11 @@ sub parse_URL($){
 		print $t;
 	}
 	
-	if (scalar(@alerts) > 1) {
+	#print "Num alerts: ".scalar(@alerts)."\n";
+	
+	if (scalar(@alerts) > 0) {
 		printDivider();
-		print "Alerts:";
+		print "Alerts:\n";
 		foreach (@alerts) {
 			print $_."\n";
 		}
@@ -270,7 +277,7 @@ sub parse_PSI($){
 	system (qq{$command});
 	$ei = readTemp("temp")." UTC";
 	system (qq{del temp});
-	system (qq{rm temp});
+	#system (qq{rm temp});
 	
 	#$unix last three digits removed to make it a unix timestamp. Should match the EI timestamp
 	$unix = substr($unix, 0, -3);
@@ -337,6 +344,7 @@ sub parse_sourceid($){
 	return "$sourceid\t\t(Google Chrome - Instant Enabled)" if ($sourceid eq "chrome-instant");
 	return "$sourceid\t\t(Google Chrome - unsure)" if ($sourceid eq "chrome-psyapi2");
 	return "$sourceid\t\t(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
+	return "$sourceid\t\t(Opera)" if ($sourceid eq "opera");
 }
 
 sub parse_client($){
@@ -344,6 +352,7 @@ sub parse_client($){
 	return "$client\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
 	return "$client\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
 	return "$client\t\t(Chrome for Android)" if ($client eq "ms-android-google");
+	return "$client\t\t(Opera)" if ($client eq "opera");
 	return $client
 }
 
@@ -370,16 +379,26 @@ sub parse_site($){
 # https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h
 # From the looks of things this is Chrome only - it appears when you perform a search offline through the search bar. Doesn't appear in other browsers
 # HOST BASED PARAMETER
+# Field 1 indicates whether the user selected an item from the dropdown list (whether they selected it themselves or it was autofilled)
 sub parse_aqs($){
 	my $aqs = shift;
 	my @args = split /\./, $aqs;
+	my $comment;
+		
+	if ($args[1] ne ""){
+		$comment .= "(Item ".($args[1]+1). " selected)";
+		push @alerts, "I've found this means that the browser autofilled the query and the user didn't delete it" if ($args[1] eq "0");
+	}
+	
 	
 	if (exists $args[3]){
 		(my $time, my @other) = split /j/, $args[3];
-		return $aqs."\t\t($time milliseconds from first keypress to search. Other parameters unknown)";
+		$comment .= "($time milliseconds from first keypress to search. Other parameters unknown)";
 	}
 	
-	return $aqs;
+	$comment =~ s/\)\(/, /g;
+	
+	return "$aqs\t\t$comment";
 }
 
 #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
@@ -442,6 +461,14 @@ sub parse_ust($){
 	my $unix = substr($ust, 0, 10);
 	$unix = gmtime($unix);
 	return "$ust\t\t($unix UTC - unsure of validity)";
+}
+
+sub parse_zx($){
+	my $zx = shift;
+ #first 10 characters are a unix timestamp
+	my $unix = substr($zx, 0, 10);
+	$unix = gmtime($unix);
+	return "$zx\t\t($unix UTC - unsure of validity)";
 }
 
 
@@ -575,7 +602,7 @@ sub parse_uact($){
 # iniital testing on chrome, logged in, shows ion means instant is turned on. but that doesn't mean it works if the computer/internet connection ? isnt fast enough
 sub parse_ion($){
 	my $ion = shift;
-	return "$ion\t\t -- Inital Testing indicated this means that Instant is on" if ($ion eq "1");
+	return "$ion\t\t -- Inital Testing indicated this means that Instant is on, however Instant may not always function depending on the setting" if ($ion eq "1");
 	return "$ion\t\t -- not implemented yet"
 }
 
@@ -613,7 +640,7 @@ sub parse_bvm($){
 # contains information about the users search
 
 
-# further testing required for characters typed and deleted
+# further testing required for characters typed and deleted. so far it looks like val[9] indicates a change in the number of characters
 sub parse_gs_l($){
 	my $gs_l = shift;
 	my @vals = split /\./, $gs_l;
@@ -624,9 +651,12 @@ sub parse_gs_l($){
 	$comment .= "(Google Instant Search)" if ($vals[1] eq "10");
 	
 	$comment .= "(".ordinal($vals[2]+1). " entry selected)" if ($vals[2]);	
-	
-    $comment .= "(May indicate - ".$vals[8]." characters typed" if ($vals[8]);   
-    $comment .= "(May indicate - ".$vals[8]." characters deleted" if ($vals[10]);		
+		$comment .= "(Characters changed, more testing required" if ($vals[9]);
+    
+	#$comment .= "(".$vals[7]." may indicate time it takes to get from getting to google to submitting the search, further testing required)" if ($vals[7]);
+
+	#$comment .= "(May indicate - ".$vals[9]." characters changed" if ($vals[9]);   
+    #$comment .= "(May indicate - ".$vals[10]." characters deleted" if ($vals[10]);		
 	
 	#$comment .= ")";
 	$comment =~ s/\)\(/, /g;
