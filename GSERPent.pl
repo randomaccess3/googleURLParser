@@ -30,6 +30,7 @@
 #			- fixed bug in printing alerts, added additional decoding to aqs parameter
 #			- further research into gs_l
 #			- commented out rm temp to avoid errors on windows
+# 20170116  - researched sa parameter, added hl, filter
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -217,13 +218,17 @@ sub parse_URL($){
 		$parameters{$u} = parse_ion($parameters{$u}) if ($u eq "ion");
 		$parameters{$u} = parse_espv($parameters{$u}) if ($u eq "espv");
 		$parameters{$u} = parse_cr($parameters{$u}) if ($u eq "cr");
+		$parameters{$u} = parse_filter($parameters{$u}) if ($u eq "filter");
+		$parameters{$u} = parse_dpr($parameters{$u}) if ($u eq "dpr");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
-		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");
+		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");   #https://moz.com/blog/tracking-organic-ranking-in-google-analytics-with-custom-variables
 		$parameters{$u} .= "\t\t\(Original Query)" if ($u eq "oq");
 		$parameters{$u} .= "\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Output Encoding)" if ($u eq "oe");   #joostdevalk.nl - google websearch parameters
+		$parameters{$u} .= "\t\t(Specifies the interface language)" if ($u eq "hl");   #joostdevalk.nl - google websearch parameters
+		$parameters{$u} .= "\t\t(Show results for location)" if ($u eq "gl");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Usually indicates that this was opened in a new tab/window from the Search Results page)" if ($u eq "url");
 		
 		print "$u=$parameters{$u}\n" if (!$config{table});
@@ -346,6 +351,8 @@ sub parse_sourceid($){
 	return "$sourceid\t\t(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
 	return "$sourceid\t\t(Opera)" if ($sourceid eq "opera");
 }
+
+#identified firefox-a on https://googlesystem.blogspot.com.au/2006/07/meaning-of-parameters-in-google-query.html, but haven't researched it yet
 
 sub parse_client($){
 	my $client = shift;
@@ -476,15 +483,15 @@ sub parse_zx($){
 # seen gmail when clicking a youtube subscription link from gmail
 # seen images when clicking on a "visit page" link in image search
 # did a search and changed the returned results from date A to date B, saw source=lnt
-# sometimes I see source=hp not sure why
+# sometimes I see source=hp not sure why, may indicate the user searched from the homepage
 sub parse_source($){
 	my $source = shift;
 	return "$source\t\t(Web - standard browser search)" if ($source eq "web");
 	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
 	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
 	return "$source\t\t(seen - Unknown)" if ($source eq "lnt");
-	return "$source\t\t(seen - Unknown)" if ($source eq "hp");
-	
+	return "$source\t\t(Home Page - needs confirmationp)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
+	return "$source\t\t(User selected redirect from other Google page -- needs confirmation)" if ($source eq "lnms"); # may indicate user went from one google search type to another ie search-->images	
 	return "$source\t\t(Unknown)";
 }
 
@@ -585,12 +592,17 @@ sub parse_rct($){
 	return "$rct\t\t-- NOT IMPLEMENTED";
 }
 
-# X - unsure what it means
-# t - unsure - seen on edge
+
+# “sa=N”: User searched and “sa=X”: User clicked on related searches in the SERP).
+# http://www.t75.org/2012/06/deconstructing-googles-url-search-parameters/
+# confirmed the sa=X, this so far has only been seen when saving the link from a related search (or if you open it in a new tab)
+# usually when opening a result in a new tab from the SERP you'll see sa=t
+# havent seen sa=N yet
 sub parse_sa($){
 	my $sa = shift;
-	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "X");
-	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "t");	
+	return "$sa\t\tUser clicked on related searches in the SERP" if ($sa eq "X");
+	return "$sa\t\tUser searched (to confirm)" if ($sa eq "N");
+	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "t");
 	return "$sa\t\tunknown -- NOT IMPLEMENTED";
 }
 
@@ -634,13 +646,35 @@ sub parse_bvm($){
 }
 
 
+# https://googlesystem.blogspot.com.au/2006/07/meaning-of-parameters-in-google-query.html
+# UNTESTED
+sub parse_filter($){
+	my $filter = shift;
+	
+	#unable to recreate so unsure if 1 = hide, or dont hide
+	return "$filter\t\t(untested)";
+	
+	#return "$filter\t\t(hide duplicate results) (untested)" if ($filter eq "1");
+	#return "$filter\t\t(don't hide duplicate results) (untested)" if ($filter eq "0");
+}
+
 # so far on chrome seen when searching from the google search box in image search but not if you search on google and then change to image search
 
 # seen when searching using the google search box 
 # contains information about the users search
 
 
+# going into search settings and changing "Private results" to show "Do not use private results"
+# can't really think how this would be forensically useful
+# dpr = 1 on video search even if it's not selected on the settings page
+sub parse_dpr($){
+	my $dpr = shift;
+	return "$dpr\t\t(Do not use private results)" if ($dpr eq "1");
+}
+
+
 # further testing required for characters typed and deleted. so far it looks like val[9] indicates a change in the number of characters
+# if searched from the images.google.com it starts with img
 sub parse_gs_l($){
 	my $gs_l = shift;
 	my @vals = split /\./, $gs_l;
