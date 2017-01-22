@@ -31,6 +31,9 @@
 #			- further research into gs_l
 #			- commented out rm temp to avoid errors on windows
 # 20170116  - researched sa parameter, added hl, filter
+# 20170122  - added timezone-modifier commandline argument
+#			- added alerts for UST parameter
+#			- updated aqs parameter
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -77,10 +80,18 @@ use Text::ASCIITable;
 
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t help|?|h));
+GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s help|?|h));
 
 my $VERSION = "20170110";
 our @alerts = ();
+our $timezone_modifier = 0;
+our %parameters = {};
+
+
+if ($config{timezone}){
+	$timezone_modifier = $config{timezone};
+	$timezone_modifier =~ s/\+//;	#remove the + if the user includes it, there's no other validation
+}
 
 if ($config{help} || !%config) {
 	_help();
@@ -124,7 +135,7 @@ else {
 
 sub parse_URL($){
 	#my @alerts = "";
-	my %parameters = {};
+	
 	my $url = shift;
 	
 	#remove http
@@ -150,8 +161,6 @@ sub parse_URL($){
 	# If a hash exists in the URL then the previous search was before the hash and the current search was in the q after the hash
 	push @alerts, "# indicates second search - not implemented currently" if ($url =~ m/#/);
 	
-	
-	
 	$url =~ s/\#/\n/g;
 	
 	#remove spaces
@@ -172,8 +181,16 @@ sub parse_URL($){
 	
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
-			push @alerts, "Either additional search, or suggested search was selected from search bar (tested on chrome)";
+		push @alerts, "Regarding the q and oq parametrs: Either additional search, or suggested search was selected from search bar (tested on chrome)";
 	} 
+	
+	# UST parameter appears to relate to when Gmail was opened if it's in a redirect link from gmail	
+	if (exists($parameters{"ust"})){
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating when Gmail was opened." if ($parameters{"source"} eq "gmail");
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating wheen the image search was conducted." if ($parameters{"source"} eq "images");
+
+	}
+	
 	
 	foreach $u (sort keys %parameters){
 		
@@ -224,7 +241,7 @@ sub parse_URL($){
 		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");   #https://moz.com/blog/tracking-organic-ranking-in-google-analytics-with-custom-variables
-		$parameters{$u} .= "\t\t\(Original Query)" if ($u eq "oq");
+		$parameters{$u} .= "\t\t\(Query entered)" if ($u eq "oq");
 		$parameters{$u} .= "\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Output Encoding)" if ($u eq "oe");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Specifies the interface language)" if ($u eq "hl");   #joostdevalk.nl - google websearch parameters
@@ -387,6 +404,7 @@ sub parse_site($){
 # From the looks of things this is Chrome only - it appears when you perform a search offline through the search bar. Doesn't appear in other browsers
 # HOST BASED PARAMETER
 # Field 1 indicates whether the user selected an item from the dropdown list (whether they selected it themselves or it was autofilled)
+# if parameter doesn't have the time value, then that seems to indicate the the user had selected a word in another tab and selected "search Google for ____"
 sub parse_aqs($){
 	my $aqs = shift;
 	my @args = split /\./, $aqs;
@@ -394,7 +412,12 @@ sub parse_aqs($){
 		
 	if ($args[1] ne ""){
 		$comment .= "(Item ".($args[1]+1). " selected)";
-		push @alerts, "I've found this means that the browser autofilled the query and the user didn't delete it" if ($args[1] eq "0");
+		push @alerts, "AQS: I've found this means that the browser autofilled the query and the user didn't delete it" if ($args[1] eq "0");
+	}
+	
+	if (@args < 4){
+		my $q = $parameters{"q"};
+		$comment .= "(User right clicked on the word $q and selected \"Search Google for $q\" from the context menu in a Chromium-based browser)";
 	}
 	
 	
@@ -412,7 +435,7 @@ sub parse_aqs($){
 # language and encoding information
 sub parse_rlz($){
 	my $rlz = shift;
-	return $rlz;
+	return $rlz."\t\t--not implemented";
 }
 
 # Search engine type
@@ -425,8 +448,6 @@ sub parse_tbm($){
 	return "$tbm\t\t(Shopping Search}" if ($tbm eq "shopping");
 	return $tbm;
 }
-
-
 
 sub parse_Start($){
 # Determines page that the search is on
@@ -466,16 +487,24 @@ sub parse_ust($){
 	my $ust = shift;
  #first 10 characters are a unix timestamp
 	my $unix = substr($ust, 0, 10);
-	$unix = gmtime($unix);
-	return "$ust\t\t($unix UTC - unsure of validity)";
+	my $timezone = $timezone_modifier * (60 * 60);
+	$unix = gmtime($unix+$timezone);
+	
+	return "$ust\t\t($unix UTC$timezone_modifier)" if ($timezone_modifier =~ /-/);
+	return "$ust\t\t($unix UTC+$timezone_modifier)";
+	
 }
 
 sub parse_zx($){
 	my $zx = shift;
  #first 10 characters are a unix timestamp
 	my $unix = substr($zx, 0, 10);
-	$unix = gmtime($unix);
-	return "$zx\t\t($unix UTC - unsure of validity)";
+
+	my $timezone = $timezone_modifier * (60 * 60);
+	$unix = gmtime($unix+$timezone);
+	
+	return "$zx\t\t($unix UTC$timezone_modifier - unsure what it represents)" if ($timezone_modifier =~ /-/);
+	return "$zx\t\t($unix UTC+$timezone_modifier - unsure what it represents)";
 }
 
 
@@ -600,7 +629,7 @@ sub parse_rct($){
 # havent seen sa=N yet
 sub parse_sa($){
 	my $sa = shift;
-	return "$sa\t\tUser clicked on related searches in the SERP" if ($sa eq "X");
+	return "$sa\t\tUser clicked on related searches in the SERP. Also seen if user clicked on image search after initial search" if ($sa eq "X");
 	return "$sa\t\tUser searched (to confirm)" if ($sa eq "N");
 	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "t");
 	return "$sa\t\tunknown -- NOT IMPLEMENTED";
@@ -764,12 +793,13 @@ sub ordinal {
 sub _help {
 	print<< "EOT";
 GSERPent v.$VERSION - Google URL Parser
-GSERPent [-u url] [-f file] [-p param] [-t] [-h]
+GSERPent [-u url] [-f file] [-p param] [-t] [-tz] [-h]
 Parses Google Search and Redirect URLs to provide additional data
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
   -p|param ..........Print only supplied parameter
   -t|table ..........Table output
+  -tz|timezone ......Timezone modifier (ie +5, -5) -- currently only available for the UST parameter
   -h.................Help
   
 Lists: Required format is URL|Comment. The comment will be included in the output
