@@ -1,0 +1,43 @@
+/cfg <Filename>	Start BrowsingHistoryView with the specified configuration file. For example: 
+BrowsingHistoryView.exe /cfg "c:\config\bhv.cfg" 
+BrowsingHistoryView.exe /cfg "%AppData%\BrowsingHistoryView.cfg"
+/stext <Filename>	Save the browsing history into a regular text file.
+/stab <Filename>	Save the browsing history into a tab-delimited text file.
+/scomma <Filename>	Save the browsing history into a comma-delimited text file (csv).
+/stabular <Filename>	Save the browsing history into a tabular text file.
+/shtml <Filename>	Save the browsing history into HTML file (Horizontal).
+/sverhtml <Filename>	Save the browsing history into HTML file (Vertical).
+/sxml <Filename>	Save the browsing history into XML file.
+/sort <column>	This command-line option can be used with other save options for sorting by the desired column. If you don't specify this option, the list is sorted according to the last sort that you made from the user interface. The <column> parameter can specify the column index (0 for the first column, 1 for the second column, and so on) or the name of the column, like "Title" and "URL". You can specify the '~' prefix character (e.g: "~Visit Time") if you want to sort in descending order. You can put multiple /sort in the command-line if you want to sort by multiple columns.
+Examples: 
+BrowsingHistoryView.exe /shtml "f:\temp\history.html" /sort 2 /sort ~1 
+BrowsingHistoryView.exe /shtml "f:\temp\history.html" /sort "URL" /sort "Visit Time"
+
+/nosort	When you specify this command-line option, the list will be saved without any sorting.
+/SaveDirect	Save the browsing history in SaveDirect mode. For using with the other save command-line options ( /scomma, /stab, /sxml, and so on...) When you use the SaveDirect mode, the history lines are saved directly to the disk, without loading them into the memory first. This means that you can save a list with large amount of history lines into your disk without any memory problem, as long as you have enough disk space to store the saved file. The drawback of this mode: You cannot sort the lines according to the column you choose with /sort command-line option.
+/HistorySource <Source>	Specifies the type of history data source:
+1 - Load history from the current running system (All users).
+2 - Load history from the current running system (Only current user).
+3 - Load history from the specified profiles folder (/HistorySourceFolder command-line parameter).
+4 - Load history from the specified profile (/HistorySourceFolder command-line parameter).
+/HistorySourceFolder <Folder>	Specifies the folder path if /HistorySource is 3 or 4.
+/VisitTimeFilterType <Filter Type>	Specifies the type of date/time filter:
+1 - Load history from any date/time.
+2 - Load history from the last xx hours (xx specified in /VisitTimeFilterValue)
+3 - Load history from the last xx days (xx specified in /VisitTimeFilterValue)
+4 - Load history from the specified date/time range (The time range is specified in /VisitTimeFrom and /VisitTimeTo)
+/VisitTimeFilterValue <Filter Value>	Specifies the filter value when /VisitTimeFilterType is 2 or 3
+/VisitTimeFrom <Time>
+/VisitTimeTo <Time>	Specifies the date/time range when /VisitTimeFilterType is 4. date/time value must be in the following format: dd-mm-yyyy hh:nn:ss
+For example: 
+BrowsingHistoryView.exe /VisitTimeFrom "10-01-2012 12:00:00" /VisitTimeTo "18-02-2012 10:00:00"
+
+/LoadIE <0 | 1>
+/LoadFirefox <0 | 1>
+/LoadChrome <0 | 1>
+/LoadSafari <0 | 1>
+Specifies whether to load the history of IE/Firefox/Chrome/Safari Web browser. 0 = Don't load, 1 = Load.
+
+
+
+browsinghistoryview.exe /stab browsinghistoryview.txt /HistorySource 3 /HistorySourceFolder "C:\Users\pmoore\AppData\Local\Google\Chrome\User Data\Profile 1"  /VisitTimeFilterType 2 /VisitTimeFilterValue 1 /LoadChrome 1

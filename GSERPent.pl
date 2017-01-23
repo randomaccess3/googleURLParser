@@ -34,6 +34,9 @@
 # 20170122  - added timezone-modifier commandline argument
 #			- added alerts for UST parameter
 #			- updated aqs parameter
+# 20170123	- moved EI note to alert, update biw, bih
+
+my $VERSION = "20170123";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -53,7 +56,7 @@
 # Doesnt deal with # in search
 # Doesn't remove +'s in q or oq value
 
-#Research
+# Research
 # http://www.ramdynamo.com/2014/03/google-gferdcr-url-mystery-revealed.html
 # https://cs.chromium.org/chromium/src/chrome/common/search/instant_types.h?q=aqs&sq=package:chromium&dr=C&l=181
 # https://gist.github.com/sshay77/4b1f6616a7afabc1ce2a
@@ -82,7 +85,7 @@ my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
 GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s help|?|h));
 
-my $VERSION = "20170110";
+
 our @alerts = ();
 our $timezone_modifier = 0;
 our %parameters = {};
@@ -238,8 +241,8 @@ sub parse_URL($){
 		$parameters{$u} = parse_filter($parameters{$u}) if ($u eq "filter");
 		$parameters{$u} = parse_dpr($parameters{$u}) if ($u eq "dpr");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
-		$parameters{$u} .= "\t\t(Screen Resolution - Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
-		$parameters{$u} .= "\t\t(Screen Resolution - Width)" if ($u eq "biw");
+		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
+		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
 		$parameters{$u} .= "\t\t(Link number - further testing required)" if ($u eq "cd");   #https://moz.com/blog/tracking-organic-ranking-in-google-analytics-with-custom-variables
 		$parameters{$u} .= "\t\t\(Query entered)" if ($u eq "oq");
 		$parameters{$u} .= "\t\t(Input Encoding)" if ($u eq "ie");   #joostdevalk.nl - google websearch parameters
@@ -317,7 +320,8 @@ sub parse_EI($){
 	my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
 	#print $command."\n";
 	system (qq{$command});
-	$ei .= "\t\t(".readTemp("temp")." UTC) - Session Start Time - Set by Google's Time Servers to indicate the start of a session";
+	$ei .= "\t\t(".readTemp("temp")." UTC) - Session Start Time";
+	push @alerts, "EI: Set by Google's Time Servers to indicate the start of a session. If found in cache this isn't always reliable";
 	system (qq{del temp});
 	return $ei;
 }
