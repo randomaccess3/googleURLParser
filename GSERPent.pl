@@ -35,21 +35,26 @@
 #			- added alerts for UST parameter
 #			- updated aqs parameter
 # 20170123	- moved EI note to alert, update biw, bih
+# 20170220  - added URI package instead of manual parsing
+#			- updated alerts for ust
+#			- added ved parsing, to be completed
 
-my $VERSION = "20170123";
+my $VERSION = "20170220";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
 # ppm install Text-ASCIITable
 # requires python 2.7 installed to run the EI parser - https://raw.githubusercontent.com/cheeky4n6monkey/4n6-scripts/master/google-ei-time.py
-# Automatically downloads the python EI parser if its not detected
+# Requires cheeky4n6monkey/4n6-scripts/master/google-ei-time to be in the same folder
+# Requires https://github.com/TomAnthony/ved-decoder/ which is an updated forked parser originally written by Benjamin Schulz (https://github.com/beschulz)
+# pip install protobuf to use the ved-decoder
+
 
 #To Install OS X
 # cpan Text::ASCIITable
 
-#To do ; put in download code for EI parser 
+#To do ; put in download code for EI parser and ved decoder, updated ved decoder to use install protobuf rather than lib directory
 # separate # from URL as it denotes a second search
-# include the proto code for python
 # probably port to python
 
 # Known bug
@@ -63,15 +68,20 @@ my $VERSION = "20170123";
 
 
 # Old VED/New VED - https://deedpolloffice.com/blog/articles/decoding-ved-parameter
+#	Ved decoder - https://github.com/TomAnthony/ved-decoder
+
 
 #Original Query - If the original query is less than the q value then it's possible that the user has clicked on a suggested post - need more research on the topic
 
 
-#my $ved_parser = "/Users/phill/Desktop/GoogleURLParser/protobuff/ved-decoder-master/ved.py";
+
+
 
 
 use Data::Dumper;
+use URI;
 use URI::Escape;
+use URI::Split qw(uri_split uri_join);
 use strict;
 
 use Getopt::Long;
@@ -141,47 +151,23 @@ sub parse_URL($){
 	
 	my $url = shift;
 	
-	#remove http
-	$url =~ s/^http[s]:\/\///g if ($url =~ m/^http[s]:\/\//);
+	my $u = URI->new($url);
+	my ($scheme, $domain, $path, $query, $frag) = uri_split($u);
 	
-	# $url =~ s/^https\:\/\/[w*\.]google\..*\/(a-z*)\?//;
-	#remove http://www.google.com.*/
-	my ($google, @rest) = split /\//, $url;
-	$url = join('\/', @rest);
-	$url =~ s/\\\//\//g;
-		
-	# need to add code to remove the part between google.*/(.*)?parameters
-	# the .* is optional, but my provide additional information
-	
-	#extract the term between google.com/___?
-	$url =~ s/(.*)\?//g;
-	push @alerts, "Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($1 eq "url");
-	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($1 eq "imgres");
-	
-	
-	$url =~ s/\&/\n/g;
-	
-	# If a hash exists in the URL then the previous search was before the hash and the current search was in the q after the hash
-	push @alerts, "# indicates second search - not implemented currently" if ($url =~ m/#/);
-	
-	$url =~ s/\#/\n/g;
-	
-	#remove spaces
-	$url =~ s/ //g;
-	
-	#print "URL:".$url."\n";
+	# load parameters (split by &)
+	%parameters = $u->query_form($u);
 
-	my @urlentries = split /\n/, $url;
 	
-		
-	#load hash with parameters
-	my $u;
-	foreach $u (@urlentries){
-		$parameters{$1} = uri_unescape($2) if ($u =~ m/(.*)=(.*)/g); # may need to run uri_unescape twice
-	}
+	push @alerts, "Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
+	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($path eq "/imgres");
+	push @alerts, "URL taken from cache - haven't tested the parsing" if ($path eq "/gen_204" || $path eq "/complete/search");	
+	
+	
+	# If a fragment (hash) exists in the URL then the previous search was before the hash and the current search was in the q after the hash
+	# Sometimes google won't add the #, and just recreates the query again
+	push @alerts, "# indicates second search - not implemented currently.\nFragment = $frag" if ($frag);
 
-	$u = "";
-	
+
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
 		push @alerts, "Regarding the q and oq parametrs: Either additional search, or suggested search was selected from search bar (tested on chrome)";
@@ -189,13 +175,12 @@ sub parse_URL($){
 	
 	# UST parameter appears to relate to when Gmail was opened if it's in a redirect link from gmail	
 	if (exists($parameters{"ust"})){
-		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating when Gmail was opened." if ($parameters{"source"} eq "gmail");
-		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating wheen the image search was conducted." if ($parameters{"source"} eq "images");
-
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after Gmail was opened." if ($parameters{"source"} eq "gmail");
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after when the image search was conducted." if ($parameters{"source"} eq "images");
 	}
 	
 	
-	foreach $u (sort keys %parameters){
+	foreach my $u (sort keys %parameters){
 		
 		#Unsure why the hash has a HASH -> undef entry in it, this line skips it
 		next if (!defined($parameters{$u}));
@@ -368,7 +353,7 @@ sub parse_sourceid($){
 	my $sourceid = shift;
 	return "$sourceid\t\t(Google Chrome)" if ($sourceid eq "chrome");
 	return "$sourceid\t\t(Google Chrome - Instant Enabled)" if ($sourceid eq "chrome-instant");
-	return "$sourceid\t\t(Google Chrome - unsure)" if ($sourceid eq "chrome-psyapi2");
+	return "$sourceid\t\t(Google Chrome - Instant Enabled? unsure)" if ($sourceid eq "chrome-psyapi2");
 	return "$sourceid\t\t(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
 	return "$sourceid\t\t(Opera)" if ($sourceid eq "opera");
 }
@@ -487,6 +472,8 @@ sub parse_safe($){
 # So far this time has only appeared when you select a picture and then click on the "Visit page" or "View Image" boxes
 # Selecting the image itself straight off the search page doesn't appear to generate this value but havent looked in the internet
 # history, just right click, saved link and parsed
+# I've also found it on links opened in Gmail that open in a new tab. They usually use a google redirect link and the UST timestamp indicates when
+# Gmail was opened (but it appears to be 24 hours ahead)
 sub parse_ust($){
 	my $ust = shift;
  #first 10 characters are a unix timestamp
@@ -745,15 +732,38 @@ sub parse_gs_l($){
 #https://deedpolloffice.com/blog/articles/decoding-ved-parameter
 
 #Ved parser by https://github.com/beschulz/ved-decoder
+# updated - https://github.com/TomAnthony/ved-decoder
+
+# This uses it's own proto library, so may not be the most up to date
+
+
+
+
+
 sub parse_VED($){
 	my $ved = shift;
-	# print "ved = $ved\n";
-	# my $command = "echo $ved > temp1";
-	# system (qq{$command});
-	# $command = "cat temp | $ved_parser"; 
-	# system (qq{$command});
-	# print "VED: ". readTemp("temp1")."\n\n\n\n";
-	return $ved."\t\t -- not implemented\n";
+	my $ved_parser = "python ved-decoder-master/ved.py";
+	my $command = "echo $ved | $ved_parser > ved_temp"; 
+	system (qq{$command});
+	my $comment = readTemp("ved_temp");
+
+	# find ts: parameter
+	$comment =~ s/\n//g;
+	$comment =~ s/.*ts: (\d*),.*//g;
+	
+	my $unix = substr($1, 0, 10);
+	my $timezone = $timezone_modifier * (60 * 60);
+	my $gm_unix = gmtime($unix+$timezone);
+	
+	if ($timezone_modifier =~ /-/){
+		$comment = "($unix UTC = $gm_unix UTC$timezone_modifier)" ;
+	}
+	else {
+		$comment = "($unix UTC = $gm_unix UTC+$timezone_modifier)";
+	}
+	
+	push @alerts, "VED: There are other parameters, the timestamp is the only one I currently extract";
+	return "$ved\t\t$comment\n";
 }
 
 
