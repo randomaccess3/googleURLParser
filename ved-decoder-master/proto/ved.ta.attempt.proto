@@ -1,0 +1,83 @@
+syntax = "proto2";
+
+package ved;
+
+message Ved
+{
+	enum Type
+	{
+		WEB = 22;
+		BLOG_SEARCH_RESULT = 152;
+		BOOK_SEARCH_RESULT = 232;
+		BOOK_SEARCH_RESULT_THUMBNAIL = 235;
+		IMAGE_SEARCH_RESULT_IN_BASIC_NON_JAVASCRIPT_IMAGE_SEARCH_OR_IMAGE_RESULT_IN_UNIVERSAL_SEARCH = 245;
+		LOCAL_SEARCH_RESULT = 288;
+		NEWS_RESULT_THUMBNAIL = 295;
+		NEWS_RESULT = 297;
+		MORE_RESULTS_LINK_LISTED_MAINLY_FOR_QA_WEBSITES = 300;
+		VIDEO_RESULT = 311;
+		VIDEO_RESULT_THUMBNAIL = 312;
+		ONE_LINE_SITELINK = 338;
+		SHOPPING_SEARCH_RESULT = 371;
+		IMAGE_SEARCH_RESULT_PROBABLY_NOT_IN_USE_ANY_MORE = 429;
+		JUMP_TO_LINK = 586;
+		MAP_SEARCH_RESULT_WEBSITE_LINK = 612;
+		MAP_SEARCH_RESULT_THUMBNAIL = 646;
+		ADWORD_SITELINK = 706;
+		BREADCRUMB = 745;
+		PATENT_RESULT_OVERVIEW_RELATED_DISCUSS_LINK = 1107;
+		BOOK_SEARCH_RESULT_AUTHOR_LINK = 1140;
+		NORMAL_RESULT_THUMBNAIL_EG_FOR_AN_APPLICATION_RECIPE_ETC = 1146;
+		NORMAL_RESULT_THUMBNAIL_EG_FOR_AN_APPLICATION_RECIPE_ETC_ALT = 1150;
+		LOCAL_SEARCH_RESULT_MARKER_PIN_ICON = 1455;
+		NEWS_SUB_RESULT_IE_THE_SAME_STORY_FROM_A_DIFFERENT_SITE = 1532;
+		ADWORD_IE_SPONSORED_SEARCH_RESULT = 1617;
+		MAP_SEARCH_RESULT = 1701;
+		KNOWLEDGE_GRAPH_REPEATED_SUB_LINK_EG_FOOTBALL_TEAM_SQUAD_PLAYERS_ALBUM_TRACK_LISTINGS = 1732;
+		SPONSORED_SHOPPING_RESULT_THUMBNAIL_IN_RIGHT_HAND_COLUMN_OF_UNIVERSAL_SEARCH_RESULTS = 1907;
+		SPONSORED_SHOPPING_RESULT_IN_RIGHT_HAND_COLUMN_OF_UNIVERSAL_SEARCH_RESULTS = 1908;
+		SPONSORED_SHOPPING_RESULT_THUMBNAIL_IN_MAIN_COLUMN_OF_UNIVERSAL_SEARCH_RESULTS = 1986;
+		SPONSORED_SHOPPING_RESULT_IN_MAIN_COLUMN_OF_UNIVERSAL_SEARCH_RESULTS = 1987;
+		SITELINK = 2060;
+		NEWS_RESULT_VIDEO_THUMBNAIL = 2237;
+		KNOWLEDGE_GRAPH_LINK = 2459;
+		AUTHORSHIP_BY_AUTHOR_LINK = 2847;
+		AUTHORSHIP_THUMBNAIL_LINK = 2937;
+		IMAGE_SEARCH_RESULT_THUMBNAIL = 3588;
+		IMAGE_SEARCH_RESULT_PREVIEW_VIEW_IMAGE_LINK = 3596;
+		IMAGE_SEARCH_RESULT_PREVIEW_THUMBNAIL = 3597;
+		IMAGE_SEARCH_RESULT_PREVIEW_TITLE_LINK = 3598;
+		IMAGE_SEARCH_RESULT_PREVIEW_VISIT_PAGE_LINK = 3599;
+		IMAGE_SEARCH_RESULT_PREVIEW_GREY_WEBSITE_LINK_UNDERNEATH_TITLE = 3724;
+		KNOWLEDGE_GRAPH_MAIN_IMAGE = 3836;
+		IN_DEPTH_ARTICLE_RESULT = 5077;
+		IN_DEPTH_ARTICLE_RESULT_THUMBNAIL = 5078;
+		ADWORD_ONE_LINE_SITELINK = 5158;
+		DICTIONARY_DEFINITION_LINK = 5497;
+	};
+
+	optional int32 index_boost        = 1; // i
+	optional Type type               = 2; // t
+	optional int32 sub_link_position  = 5; // (zero based)
+	optional int32 result_position    = 6; // r (zero based)
+	optional int32 start              = 7; // s (zero based)
+
+	optional int32 unknown_3          = 3; // unknown
+	optional int32 unknown_4          = 4; // unknown
+	optional int32 unknown_8          = 8; // unknown
+	optional int32 unknown_9          = 9; // unknown
+	optional int32 unknown_10         = 10; // unknown
+	optional int32 unknown_11         = 11; // unknown
+	optional int32 unknown_12         = 12; // unknown
+	optional int32 unknown_13         = 13; // unknown
+	optional int32 unknown_14         = 14; // unknown
+	optional int32 unknown_15         = 15; // unknown
+	optional int32 unknown_16         = 16; // unknown
+	optional int32 unknown_17         = 17; // unknown
+	optional int32 unknown_18         = 18; // unknown
+	optional int32 unknown_19         = 19; // unknown
+	optional int32 unknown_20         = 20; // unknown
+	optional int32 unknown_21         = 21; // unknown
+	optional int32 unknown_22         = 22; // unknown
+	optional int32 unknown_23         = 23; // unknown
+}

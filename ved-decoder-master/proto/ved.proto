@@ -1,0 +1,100 @@
+syntax = "proto2";
+
+package ved;
+
+message Ved {
+
+    enum Type {
+        normal_universal_search_result = 22;
+        blog_search_result = 152;
+        patent_result = 232;
+        patent_result_thumbnail = 235;
+        image_search_result_in_basic_image_search_universal_search = 245;
+        local_search_result = 288;
+        news_result_thumbnail = 295;
+        news_result = 297;
+        more_results_link_listed_mainly_for_QA_websites = 300;
+        video_result = 311;
+        video_result_thumbnail = 312;
+        oneline_sitelink = 338;
+        shopping_search_result = 371;
+        image_search_result = 429;
+        new_image_search_result = 51;
+        Jump_to_link = 586;
+        map_search_result_website_link = 612;
+        map_search_result_thumbnail = 646;
+        adword_sitelink = 706;
+        breadcrumb = 745;
+        patent_result_Overview_Related_Discuss_link = 1107;
+        book_search_result_author_link = 1140;
+        normal_result_thumbnail_1 = 1146;
+        normal_result_thumbnail_2 = 1150;
+        local_search_result_marker_pin_icon = 1455;
+        news_sub_result = 1532;
+        sponsored_search_result = 1617;
+        map_search_result = 1701;
+        knowledge_graph_repeated_sub_link = 1732;
+        sponsored_shopping_result_thumbnail = 1907;
+        sponsored_shopping_result = 1908;
+        sponsored_shopping_result_thumbnail_ = 1986;
+        sponsored_shopping_result_main_column_of_universal_search = 1987;
+        sitelink = 2060;
+        news_result_video_thumbnail = 2237;
+        knowledge_graph_link = 2459;
+        authorship_by_author_link = 2847;
+        authorship_thumbnail_link = 2937;
+        image_search_result_thumbnail = 3588;
+        image_search_result_preview_View_image_link = 3596;
+        image_search_result_preview_thumbnail = 3597;
+        image_search_result_preview_title_link = 3598;
+        image_search_result_preview_Visit_page_link = 3599;
+        image_search_result_preview_grey_website_link_underneath_title = 3724;
+        knowledge_graph_main_image = 3836;
+        indepth_article_result = 5077;
+        indepth_article_result_thumbnail = 5078;
+        adword_oneline_sitelink = 5158;
+        dictionary_definition_link = 5497;
+    }
+    ;
+
+    message Mysterious {
+        message NestedMysterious {
+            optional int64 ts = 1;
+            optional sfixed32 mysterious1 = 2;
+            optional sfixed32 mysterious2 = 3;
+        }
+        optional NestedMysterious nested_mysterious_msg = 1;
+    }
+
+    optional uint64 link_index = 1;
+    optional Type link_type = 2;
+    optional uint64 sub_result_position = 5;
+    optional uint64 result_position = 6;
+    optional uint64 start_result_position = 7;
+    optional uint64 v3 = 3;
+    optional uint64 v4 = 4;
+    optional uint64 v8 = 8;
+    optional uint64 v9 = 9;
+    optional uint64 v10 = 10;
+    optional uint64 v11 = 11;
+    optional uint64 v12 = 12;
+    
+    /**
+    It seems that the ved structure has changed.
+    pos 13 now has nested types
+    1: 51
+    2: 51
+    5: 1
+    6: 1
+    13 {
+        1 {
+            1: 1437758367149743 //this seems to be microseconds since epoch
+            2: 0x0a883787 //hex to num: 176699271 / 176723780 / 176725331 ... seems that it could be the number of clicks/views/?? on the ad/campaign?
+            //the closer you click again the closer the number is
+            3: 0x9504a24e //2500108878
+        }
+    }
+    */
+
+    optional Mysterious mysterious_msg = 13;
+}
