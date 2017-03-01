@@ -38,16 +38,23 @@
 # 20170220  - added URI package instead of manual parsing
 #			- updated alerts for ust
 #			- added ved parsing, to be completed
+# 20170227  - minor updates
+#			- add authuser parameter, update site
+# 20170228	- move timezone parsing code to routine and started adding option to parse timezone for certain artefacts
+#			- added output to history file if -hist option provided
 
-my $VERSION = "20170220";
+
+
+
+my $VERSION = "20170228";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
 # ppm install Text-ASCIITable
 # requires python 2.7 installed to run the EI parser - https://raw.githubusercontent.com/cheeky4n6monkey/4n6-scripts/master/google-ei-time.py
 # Requires cheeky4n6monkey/4n6-scripts/master/google-ei-time to be in the same folder
-# Requires https://github.com/TomAnthony/ved-decoder/ which is an updated forked parser originally written by Benjamin Schulz (https://github.com/beschulz)
-# pip install protobuf to use the ved-decoder
+# Requires https://github.com/TomAnthony/ved-decoder/ which is an updated forked parser originally written by Benjamin Schulz (https://github.com/beschulz) to be extracted into the same directory (ved-decoder-master)
+# pip install protobuf to use the ved-decoder (although there is a version of protobuf included so might not be required to install)
 
 
 #To Install OS X
@@ -75,9 +82,6 @@ my $VERSION = "20170220";
 
 
 
-
-
-
 use Data::Dumper;
 use URI;
 use URI::Escape;
@@ -93,7 +97,7 @@ use Text::ASCIITable;
 
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s help|?|h));
+GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s history|hist help|?|h));
 
 
 our @alerts = ();
@@ -114,6 +118,13 @@ if ($config{help} || !%config) {
 my $url; 
 if ($config{url}) {
 	$url = $config{url};
+	
+	if ($config{history}){
+		open(FH,">>","history.txt");
+		print FH $url."|".localtime()."\n";
+		close(FH);
+	}
+	
 	printEqDivider();
 	print $url."\n";
 	printEqDivider();
@@ -170,7 +181,7 @@ sub parse_URL($){
 
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
-		push @alerts, "Regarding the q and oq parametrs: Either additional search, or suggested search was selected from search bar (tested on chrome)";
+		push @alerts, "Regarding the q and oq parameters: Either additional search, or suggested search was selected from search bar (tested on chrome)";
 	} 
 	
 	# UST parameter appears to relate to when Gmail was opened if it's in a redirect link from gmail	
@@ -225,6 +236,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_cr($parameters{$u}) if ($u eq "cr");
 		$parameters{$u} = parse_filter($parameters{$u}) if ($u eq "filter");
 		$parameters{$u} = parse_dpr($parameters{$u}) if ($u eq "dpr");
+		$parameters{$u} = parse_authuser($parameters{$u}) if ($u eq "authuser");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
@@ -283,32 +295,41 @@ sub parse_PSI($){
 	my ($ei, $unix, $unknown) = split /\./, $psi;
 	
 	
-	my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
-	system (qq{$command});
-	$ei = readTemp("temp")." UTC";
-	system (qq{del temp});
-	#system (qq{rm temp});
+	my $command = "python google-ei-time.py -e \"".$ei."\" > temp";
+	my $unix = run_single_line_command($command, "temp");
+	
+	$unix =~ s/\n//g;
+	$unix =~ s/.*Extracted timestamp = //g;
+	$unix =~ s/(0-9)*Human.*//g;
+	my $ei = modify_unix_timezone($unix);
 	
 	#$unix last three digits removed to make it a unix timestamp. Should match the EI timestamp
 	$unix = substr($unix, 0, -3);
-	$unix = gmtime($unix);
+	$unix = modify_unix_timezone($unix);
 	
-	$psi .= "\t\t($ei,$unix,$unknown)";
-	return $psi;
+	my $comment = "$ei,$unix,$unknown";
+	return "$psi\t\t($comment)";
 }
 
 #indicates the start of a session
-#can reliably get this value if you go to Google's homepage on chrome
+#can reliably get this value if you go to Google's homepage on chrome, and when a new tab/window is opened on a navigation number at the bottom of a search
 sub parse_EI($){
 	my $ei = shift;
 	
-	my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
-	#print $command."\n";
-	system (qq{$command});
-	$ei .= "\t\t(".readTemp("temp")." UTC) - Session Start Time";
+	#my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
+	
+	my $command = "python google-ei-time.py -e \"".$ei."\" > temp";
+	my $unix = run_single_line_command($command, "temp");
+	
+	$unix =~ s/\n//g;
+	$unix =~ s/.*Extracted timestamp = //g;
+	$unix =~ s/(0-9)*Human.*//g;
+	my $comment = modify_unix_timezone($unix);
+	
+	
 	push @alerts, "EI: Set by Google's Time Servers to indicate the start of a session. If found in cache this isn't always reliable";
-	system (qq{del temp});
-	return $ei;
+	
+	return "$ei\t\t($comment)";
 }
 
 sub parse_GFE_RD($){
@@ -349,6 +370,18 @@ sub parse_GFNS($){
 	return $gfns;
 }
 
+#occasionally shows up on the Google Home page (instead of sig2)
+sub parse_authuser($){
+	my $authuser = shift;
+	if ($authuser eq "0"){
+		return "$authuser\t\t(A user was logged in)";
+	}
+	else {
+		return "$authuser\t\t(Unsure, haven't seen before)";
+	}
+	
+}
+
 sub parse_sourceid($){
 	my $sourceid = shift;
 	return "$sourceid\t\t(Google Chrome)" if ($sourceid eq "chrome");
@@ -380,6 +413,7 @@ sub parse_sclient($){
 sub parse_site($){
 	my $site = shift;
 	return "$site\t\tseen --NOT IMPLEMENTED" if ($site eq "");
+	return "$site\t\t(Previous page was Web Homepage)" if ($site eq "webhp");
 	return $site;
 }
 
@@ -477,25 +511,17 @@ sub parse_safe($){
 sub parse_ust($){
 	my $ust = shift;
  #first 10 characters are a unix timestamp
-	my $unix = substr($ust, 0, 10);
-	my $timezone = $timezone_modifier * (60 * 60);
-	$unix = gmtime($unix+$timezone);
-	
-	return "$ust\t\t($unix UTC$timezone_modifier)" if ($timezone_modifier =~ /-/);
-	return "$ust\t\t($unix UTC+$timezone_modifier)";
-	
+	my $unix = substr($ust, 0, 10);	
+	my $comment = modify_unix_timezone($unix);
+	return "$ust\t\t($comment)";
 }
 
 sub parse_zx($){
 	my $zx = shift;
  #first 10 characters are a unix timestamp
 	my $unix = substr($zx, 0, 10);
-
-	my $timezone = $timezone_modifier * (60 * 60);
-	$unix = gmtime($unix+$timezone);
-	
-	return "$zx\t\t($unix UTC$timezone_modifier - unsure what it represents)" if ($timezone_modifier =~ /-/);
-	return "$zx\t\t($unix UTC+$timezone_modifier - unsure what it represents)";
+	my $comment = modify_unix_timezone($unix);
+	return "$zx\t\t($comment)";
 }
 
 
@@ -510,7 +536,7 @@ sub parse_source($){
 	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
 	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
 	return "$source\t\t(seen - Unknown)" if ($source eq "lnt");
-	return "$source\t\t(Home Page - needs confirmationp)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
+	return "$source\t\t(Home Page)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
 	return "$source\t\t(User selected redirect from other Google page -- needs confirmation)" if ($source eq "lnms"); # may indicate user went from one google search type to another ie search-->images	
 	return "$source\t\t(Unknown)";
 }
@@ -608,8 +634,9 @@ sub parse_esrc($){
 # j - unsure
 sub parse_rct($){
 	my $rct = shift;
-	return "$rct\t\tseen-- NOT IMPLEMENTED" if ($rct eq "j");
-	return "$rct\t\t-- NOT IMPLEMENTED";
+	my $comment = "-- NOT IMPLEMENTED"; 
+	$comment = "unknown -- NOT IMPLEMENTED" if ($rct eq "j");
+	return "$rct\t\t($comment)";
 }
 
 
@@ -620,10 +647,12 @@ sub parse_rct($){
 # havent seen sa=N yet
 sub parse_sa($){
 	my $sa = shift;
-	return "$sa\t\tUser clicked on related searches in the SERP. Also seen if user clicked on image search after initial search" if ($sa eq "X");
-	return "$sa\t\tUser searched (to confirm)" if ($sa eq "N");
-	return "$sa\t\tseen but -- NOT IMPLEMENTED" if ($sa eq "t");
-	return "$sa\t\tunknown -- NOT IMPLEMENTED";
+	my $comment = "unknown -- NOT IMPLEMENTED";
+	$comment = "User clicked on related searches in the SERP. Also seen if user clicked on image search after initial search" if ($sa eq "X");
+	$comment = "User searched - to confirm" if ($sa eq "N");
+	$comment = "unknown -- NOT IMPLEMENTED" if ($sa eq "t");
+	return "$sa\t\t($comment)";
+	
 }
 
 sub parse_uact($){
@@ -641,7 +670,8 @@ sub parse_ion($){
 
 sub parse_usg($){
 	my $usg = shift;
-	return "$usg\t\t -- NOT IMPLEMENTED";
+	my $comment = "Hash of referred URL";
+	return "$usg\t\t($comment)";
 }
 
 sub parse_pbx($){
@@ -736,36 +766,57 @@ sub parse_gs_l($){
 
 # This uses it's own proto library, so may not be the most up to date
 
-
-
-
-
 sub parse_VED($){
 	my $ved = shift;
 	my $ved_parser = "python ved-decoder-master/ved.py";
-	my $command = "echo $ved | $ved_parser > ved_temp"; 
-	system (qq{$command});
-	my $comment = readTemp("ved_temp");
 
-	# find ts: parameter
+	my $command = "echo $ved | $ved_parser > ved_temp"; 
+	my $comment = run_single_line_command($command, "ved_temp");
+
+	# find ts: parameter and remove extraneous information provided by the ved-decoder-master script
 	$comment =~ s/\n//g;
-	$comment =~ s/.*ts: (\d*),.*//g;
+	$comment =~ s/---//g;
+	$comment =~ s/$ved//g;
+	$comment =~ s/^\{/\(/g;
+	$comment =~ s/\}$/\)/g;
 	
-	my $unix = substr($1, 0, 10);
-	my $timezone = $timezone_modifier * (60 * 60);
-	my $gm_unix = gmtime($unix+$timezone);
-	
-	if ($timezone_modifier =~ /-/){
-		$comment = "($unix UTC = $gm_unix UTC$timezone_modifier)" ;
+	if ($comment =~ m/.*ts: (\d*).*/){
+	 	my $unix = substr($1, 0, 10);
+		$comment = "(".modify_unix_timezone($unix).")";
+		push @alerts, "VED: There are other parameters, the timestamp is the only one I currently extract";
 	}
-	else {
-		$comment = "($unix UTC = $gm_unix UTC+$timezone_modifier)";
-	}
-	
-	push @alerts, "VED: There are other parameters, the timestamp is the only one I currently extract";
-	return "$ved\t\t$comment\n";
+return "$ved\t\t$comment\n";
 }
 
+
+# Runs a provided command, and then reads the resultant temp file
+sub run_single_line_command($){
+	my $command = shift;
+	my $temp = shift;
+	system (qq{$command});
+	my $comment = readTemp($temp);
+	$command = "del $temp";
+	system (qq{$command});
+	return $comment;
+}
+
+#returns a modified unix timestamp
+sub modify_unix_timezone($){
+		my $unix = shift;
+		my $timezone = $timezone_modifier * (60 * 60);
+		my $comment = "";
+		my $gm_unix = gmtime($unix+$timezone);
+	
+		# check to see if its either +12,12,0, -12, throw error if not
+	
+		if ($timezone_modifier =~ /-/){
+			$comment = "$unix UTC = $gm_unix UTC$timezone_modifier" ;
+		}
+		else {
+			$comment = "$unix UTC = $gm_unix UTC+$timezone_modifier";
+		}
+		return $comment;
+}
 
 
 
@@ -813,6 +864,7 @@ Parses Google Search and Redirect URLs to provide additional data
   -f|file ...........Read a list of URLS
   -p|param ..........Print only supplied parameter
   -t|table ..........Table output
+  -hist|history .....Store executed URLs in history.txt
   -tz|timezone ......Timezone modifier (ie +5, -5) -- currently only available for the UST parameter
   -h.................Help
   
