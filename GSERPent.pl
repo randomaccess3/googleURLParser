@@ -42,11 +42,11 @@
 #			- add authuser parameter, update site
 # 20170228	- move timezone parsing code to routine and started adding option to parse timezone for certain artefacts
 #			- added output to history file if -hist option provided
+# 20170206	- added additional source, SEI parameter (untested), chips parameter, spell parameter, nfpr, added alert for ved
+#			- updated psi
 
 
-
-
-my $VERSION = "20170228";
+my $VERSION = "20170206";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -169,6 +169,8 @@ sub parse_URL($){
 	%parameters = $u->query_form($u);
 
 	
+	# ALERTS
+	
 	push @alerts, "Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
 	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($path eq "/imgres");
 	push @alerts, "URL taken from cache - haven't tested the parsing" if ($path eq "/gen_204" || $path eq "/complete/search");	
@@ -190,6 +192,19 @@ sub parse_URL($){
 		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after when the image search was conducted." if ($parameters{"source"} eq "images");
 	}
 	
+	if (exists($parameters{"EI"})){
+		push @alerts, "EI: Set by Google's Time Servers to indicate the start of a session. If found in cache this isn't always reliable";
+	}
+	
+	if (exists($parameters{"SEI"})){
+		push @alerts, "SEI: untested";
+	}
+	
+	if (exists($parameters{"ved"}) && exists($parameters{"spell"})){
+		push @alerts, "VED: If time is present this indicates the time that the user selected the correct spelling of the searched term";
+	}
+	
+	# PARSE PARAMETERS
 	
 	foreach my $u (sort keys %parameters){
 		
@@ -202,6 +217,7 @@ sub parse_URL($){
 		# Sends the parameter value to the subroutine for parsing
 		# result is returned and printed on a new line with the parameter name
 		$parameters{$u} = parse_EI($parameters{$u}) if ($u eq "ei");
+		$parameters{$u} = parse_SEI($parameters{$u}) if ($u eq "sei");
 		$parameters{$u} = parse_GFE_RD($parameters{$u}) if ($u eq "gfe_rd");
 		$parameters{$u} = parse_GWS_RD($parameters{$u}) if ($u eq "gws_rd");
 		$parameters{$u} = parse_GFNS($parameters{$u}) if ($u eq "gfns");
@@ -236,7 +252,10 @@ sub parse_URL($){
 		$parameters{$u} = parse_cr($parameters{$u}) if ($u eq "cr");
 		$parameters{$u} = parse_filter($parameters{$u}) if ($u eq "filter");
 		$parameters{$u} = parse_dpr($parameters{$u}) if ($u eq "dpr");
+		$parameters{$u} = parse_chips($parameters{$u}) if ($u eq "chips");
 		$parameters{$u} = parse_authuser($parameters{$u}) if ($u eq "authuser");
+		$parameters{$u} = parse_spell($parameters{$u}) if ($u eq "spell");
+		$parameters{$u} = parse_nfpr($parameters{$u}) if ($u eq "nfpr");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
@@ -290,8 +309,15 @@ sub parse_URL($){
 # found when examining the cache files. so far seen on chrome havent tested anything else
 # it seems that the two timestamps are different but not sure why
 # may relate to multiple searches in the same session
+# if PSI doesn't have 3 parameters then it won't parse properly
 sub parse_PSI($){
 	my $psi = shift;
+	
+	my @params = split /\./, $psi;
+	if (@params != 3){
+		return "$psi\t\t(Unknown PSI)";
+	}
+	
 	my ($ei, $unix, $unknown) = split /\./, $psi;
 	
 	
@@ -304,7 +330,7 @@ sub parse_PSI($){
 	my $ei = modify_unix_timezone($unix);
 	
 	#$unix last three digits removed to make it a unix timestamp. Should match the EI timestamp
-	$unix = substr($unix, 0, -3);
+	#$unix = substr($unix, 0, 10);
 	$unix = modify_unix_timezone($unix);
 	
 	my $comment = "$ei,$unix,$unknown";
@@ -314,10 +340,9 @@ sub parse_PSI($){
 #indicates the start of a session
 #can reliably get this value if you go to Google's homepage on chrome, and when a new tab/window is opened on a navigation number at the bottom of a search
 sub parse_EI($){
-	my $ei = shift;
-	
+	my $ei = shift;	
 	#my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
-	
+
 	my $command = "python google-ei-time.py -e \"".$ei."\" > temp";
 	my $unix = run_single_line_command($command, "temp");
 	
@@ -326,11 +351,28 @@ sub parse_EI($){
 	$unix =~ s/(0-9)*Human.*//g;
 	my $comment = modify_unix_timezone($unix);
 	
-	
-	push @alerts, "EI: Set by Google's Time Servers to indicate the start of a session. If found in cache this isn't always reliable";
-	
 	return "$ei\t\t($comment)";
 }
+
+
+# unsure what this parameter means
+sub parse_SEI($){
+	my $sei = shift;	
+	#my $command = "python google-ei-time.py -q -e \"".$ei."\" > temp";
+
+	my $command = "python google-ei-time.py -e \"".$sei."\" > temp";
+	my $unix = run_single_line_command($command, "temp");
+	
+	$unix =~ s/\n//g;
+	$unix =~ s/.*Extracted timestamp = //g;
+	$unix =~ s/(0-9)*Human.*//g;
+	my $comment = modify_unix_timezone($unix);
+	
+	return "$sei\t\t($comment)";
+}
+
+
+
 
 sub parse_GFE_RD($){
 	my $gfe_rd = shift;
@@ -536,6 +578,7 @@ sub parse_source($){
 	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
 	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
 	return "$source\t\t(seen - Unknown)" if ($source eq "lnt");
+	return "$source\t\t(Click on Google Search through chrome://apps)" if ($source eq "search_app");
 	return "$source\t\t(Home Page)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
 	return "$source\t\t(User selected redirect from other Google page -- needs confirmation)" if ($source eq "lnms"); # may indicate user went from one google search type to another ie search-->images	
 	return "$source\t\t(Unknown)";
@@ -592,6 +635,60 @@ sub parse_tbs($){
 	return "$tbs";
 }
 
+
+# seen in image search as a results filter
+# filters are presented as a row of boxes under the search bar
+# so far only seen when user accesses images.google.com directly rather than when redirected to images.google.com
+# only allows two filters
+sub parse_chips($){
+	my $chips = shift;
+	my $comment = "";
+	my @filters = split /,/, $chips;
+	
+	if (@filters == 2){
+		$filters[0] =~ s/q://g;
+		$filters[1] =~ s/g_1://g;
+		$comment = "Initial query for '$filters[0]', then filtered by '$filters[1]'";
+	}
+	
+	if (@filters == 3){
+		$filters[0] =~ s/q://g;
+		$filters[1] =~ s/g_1://g;
+		$filters[2] =~ s/g_1://g;	
+		$comment = "Initial query for '$filters[0]', then filtered by '$filters[1]', and then '$filters[2]'";
+	}
+	
+
+	return "$chips\t\t($comment)";
+}
+
+sub parse_spell($){
+	my $spell = shift;
+	my $comment = "";
+	if ($spell eq "1"){
+		$comment = "User selected to correct spelling of search result";
+	}
+	else{
+		$comment = "unknown";
+	}
+	return "$spell\t\t($comment)";
+}
+
+# If I search for a term with incorrect spelling, google will provide the search results for the correct spelling
+# if I select to search for the incorrect spelling (which is under the search box), then nfpr will appear in the URL
+sub parse_nfpr($){
+	my $nfpr = shift;
+	my $comment = "";
+	if ($nfpr eq "1"){
+		$comment = "search term spelled incorrectly, then \"Search instead for <provided search term>\" selected";
+	}
+	else{
+		$comment = "unknown";
+	}
+	return "$nfpr\t\t($comment)";
+}
+
+
 #show results for a specific country
 #could include lookup for each country
 # list is probably here: https://developers.google.com/adwords/api/docs/appendix/geotargeting
@@ -643,12 +740,13 @@ sub parse_rct($){
 # “sa=N”: User searched and “sa=X”: User clicked on related searches in the SERP).
 # http://www.t75.org/2012/06/deconstructing-googles-url-search-parameters/
 # confirmed the sa=X, this so far has only been seen when saving the link from a related search (or if you open it in a new tab)
+# If a user goes to images.google.com directly and then filters the results then sa=x
 # usually when opening a result in a new tab from the SERP you'll see sa=t
 # havent seen sa=N yet
 sub parse_sa($){
 	my $sa = shift;
 	my $comment = "unknown -- NOT IMPLEMENTED";
-	$comment = "User clicked on related searches in the SERP. Also seen if user clicked on image search after initial search" if ($sa eq "X");
+	$comment = "User clicked on related searches in the SERP. Also seen if user clicked on image search after initial search. Or filter selected from images.google.com" if ($sa eq "X");
 	$comment = "User searched - to confirm" if ($sa eq "N");
 	$comment = "unknown -- NOT IMPLEMENTED" if ($sa eq "t");
 	return "$sa\t\t($comment)";
@@ -708,11 +806,12 @@ sub parse_filter($){
 	#return "$filter\t\t(don't hide duplicate results) (untested)" if ($filter eq "0");
 }
 
+
+
 # so far on chrome seen when searching from the google search box in image search but not if you search on google and then change to image search
 
 # seen when searching using the google search box 
 # contains information about the users search
-
 
 # going into search settings and changing "Private results" to show "Do not use private results"
 # can't really think how this would be forensically useful
@@ -746,17 +845,6 @@ sub parse_gs_l($){
 	$comment =~ s/\)\(/, /g;
 	return $gs_l."\t\t". $comment. "-- IN PROGRESS";
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 #https://deedpolloffice.com/blog/articles/decoding-ved-parameter
