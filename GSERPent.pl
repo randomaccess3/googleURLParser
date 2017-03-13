@@ -42,11 +42,12 @@
 #			- add authuser parameter, update site
 # 20170228	- move timezone parsing code to routine and started adding option to parse timezone for certain artefacts
 #			- added output to history file if -hist option provided
-# 20170206	- added additional source, SEI parameter (untested), chips parameter, spell parameter, nfpr, added alert for ved
+# 20170306	- added additional source, SEI parameter (untested), chips parameter, spell parameter, nfpr, added alert for ved
 #			- updated psi
+# 20170313	- fix up timezone_modifier code
 
 
-my $VERSION = "20170206";
+my $VERSION = "20170313";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -101,14 +102,9 @@ GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s history|
 
 
 our @alerts = ();
-our $timezone_modifier = 0;
 our %parameters = {};
 
 
-if ($config{timezone}){
-	$timezone_modifier = $config{timezone};
-	$timezone_modifier =~ s/\+//;	#remove the + if the user includes it, there's no other validation
-}
 
 if ($config{help} || !%config) {
 	_help();
@@ -891,6 +887,9 @@ sub run_single_line_command($){
 #returns a modified unix timestamp
 sub modify_unix_timezone($){
 		my $unix = shift;
+		my $timezone_modifier = $config{timezone};
+		$timezone_modifier =~ s/\+//;	#remove the + if the user includes it, there's no other validation
+		
 		my $timezone = $timezone_modifier * (60 * 60);
 		my $comment = "";
 		my $gm_unix = gmtime($unix+$timezone);
