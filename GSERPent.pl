@@ -45,9 +45,11 @@
 # 20170306	- added additional source, SEI parameter (untested), chips parameter, spell parameter, nfpr, added alert for ved
 #			- updated psi
 # 20170313	- fix up timezone_modifier code
+# 20170314	- fixed timezone_modifier code again, and removed 'not implemented' comments of routines
+#			- removed unnecessary prints when param argument is entered
 
 
-my $VERSION = "20170313";
+my $VERSION = "20170314";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -102,7 +104,7 @@ GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s history|
 
 
 our @alerts = ();
-our %parameters = {};
+#our %parameters = {};
 
 
 
@@ -138,6 +140,17 @@ elsif ($config {file}){
 		my $comment;
 		($url,$comment) = split /\|/, $line;
 		$count++;
+		
+		if ($config{param}){
+			my $p = $config{param};
+			if ($url =~ m/$p/){
+				# do nothing
+			}
+			else{
+				next;
+			}
+		}
+		
 		printEqDivider();
 		print $count.": ".$url."\n";
 		print "Comment: $comment\n" if ($comment);
@@ -154,28 +167,24 @@ else {
 }
 
 sub parse_URL($){
-	#my @alerts = "";
-	
 	my $url = shift;
 	
 	my $u = URI->new($url);
 	my ($scheme, $domain, $path, $query, $frag) = uri_split($u);
 	
 	# load parameters (split by &)
-	%parameters = $u->query_form($u);
+	my %parameters = $u->query_form($u);
 
-	
 	# ALERTS
 	
-	push @alerts, "Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
-	push @alerts, "Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($path eq "/imgres");
+	push @alerts, "/URL: Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
+	push @alerts, "/IMGRES: Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($path eq "/imgres");
 	push @alerts, "URL taken from cache - haven't tested the parsing" if ($path eq "/gen_204" || $path eq "/complete/search");	
 	
 	
 	# If a fragment (hash) exists in the URL then the previous search was before the hash and the current search was in the q after the hash
 	# Sometimes google won't add the #, and just recreates the query again
 	push @alerts, "# indicates second search - not implemented currently.\nFragment = $frag" if ($frag);
-
 
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
@@ -433,26 +442,31 @@ sub parse_sourceid($){
 
 sub parse_client($){
 	my $client = shift;
-	return "$client\t\t(Mozilla Firefox)" if ($client eq "firefox-b");
-	return "$client\t\t(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
-	return "$client\t\t(Chrome for Android)" if ($client eq "ms-android-google");
-	return "$client\t\t(Opera)" if ($client eq "opera");
-	return $client
+	my $comment = "";
+	$comment = "(Mozilla Firefox)" if ($client eq "firefox-a");
+	$comment = "(Mozilla Firefox)" if ($client eq "firefox-b");
+	$comment = "(Mozilla Firefox - Search using Address Bar)" if ($client eq "firefox-b-ab");
+	$comment = "(Chrome for Android)" if ($client eq "ms-android-google");
+	$comment = "(Opera)" if ($client eq "opera");
+	$comment = "(Safari)" if ($client eq "safari");
+	return "$client\t\t$comment";
 }
 
-# unsure what it means, seen on chrome and ie so far
+# unsure what it means but so far have only seen the value to be psy-ab
 sub parse_sclient($){
 	my $sclient = shift;
-	return "$sclient\t\t(seen, not sure)" if ($sclient eq "psy-ab");
-	return $sclient
+	my $comment = "";
+	$comment = "(Seen in cache across a number of browsers)" if ($sclient eq "psy-ab");
+	return "$sclient\t\t$comment";
 }
 
 # seen chrome, blank when search from google homepage
 sub parse_site($){
 	my $site = shift;
-	return "$site\t\tseen --NOT IMPLEMENTED" if ($site eq "");
-	return "$site\t\t(Previous page was Web Homepage)" if ($site eq "webhp");
-	return $site;
+	my $comment = "";
+	#return "$site\t\tunknown" if ($site eq "");
+	$comment = "(Previous page was Web Homepage)" if ($site eq "webhp");
+	return "$site\t\t$comment";
 }
 
 
@@ -477,8 +491,8 @@ sub parse_aqs($){
 	}
 	
 	if (@args < 4){
-		my $q = $parameters{"q"};
-		$comment .= "(User right clicked on the word $q and selected \"Search Google for $q\" from the context menu in a Chromium-based browser)";
+		#my $q = $parameters{"q"};
+		$comment .= "(User right clicked on the word found in the 'q' parameter and selected \"Search Google for 'q parameter'\" from the context menu in a Chromium-based browser)";
 	}
 	
 	
@@ -496,7 +510,7 @@ sub parse_aqs($){
 # language and encoding information
 sub parse_rlz($){
 	my $rlz = shift;
-	return $rlz."\t\t--not implemented";
+	return $rlz."\t\tunknown";
 }
 
 # Search engine type
@@ -550,16 +564,19 @@ sub parse_ust($){
 	my $ust = shift;
  #first 10 characters are a unix timestamp
 	my $unix = substr($ust, 0, 10);	
-	my $comment = modify_unix_timezone($unix);
-	return "$ust\t\t($comment)";
+	my $comment = "(".modify_unix_timezone($unix).")";
+	return "$ust\t\t$comment";
 }
 
+
+#only seen in cache - google.com/gen_204?
 sub parse_zx($){
 	my $zx = shift;
  #first 10 characters are a unix timestamp
 	my $unix = substr($zx, 0, 10);
-	my $comment = modify_unix_timezone($unix);
-	return "$zx\t\t($comment)";
+	my $comment = "(".modify_unix_timezone($unix).")";
+	push @alerts, "ZX: Unsure of the meaning of this timestamp. Currently only seen in cache";
+	return "$zx\t\t$comment";
 }
 
 
@@ -570,14 +587,15 @@ sub parse_zx($){
 # sometimes I see source=hp not sure why, may indicate the user searched from the homepage
 sub parse_source($){
 	my $source = shift;
-	return "$source\t\t(Web - standard browser search)" if ($source eq "web");
-	return "$source\t\t(Clicked on link from Gmail)" if ($source eq "gmail");
-	return "$source\t\t(Clicked link from Image Search)" if ($source eq "images");
-	return "$source\t\t(seen - Unknown)" if ($source eq "lnt");
-	return "$source\t\t(Click on Google Search through chrome://apps)" if ($source eq "search_app");
-	return "$source\t\t(Home Page)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
-	return "$source\t\t(User selected redirect from other Google page -- needs confirmation)" if ($source eq "lnms"); # may indicate user went from one google search type to another ie search-->images	
-	return "$source\t\t(Unknown)";
+	my $comment = "";
+	$comment = "(Web - standard browser search)" if ($source eq "web");
+	$comment = "(Clicked on link from Gmail)" if ($source eq "gmail");
+	$comment = "(Clicked link from Image Search)" if ($source eq "images");
+	$comment = "(seen - Unknown)" if ($source eq "lnt");
+	$comment = "(Click on Google Search through chrome://apps)" if ($source eq "search_app");
+	$comment = "(Home Page)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
+	$comment = "(User selected redirect from other Google page -- needs confirmation)" if ($source eq "lnms"); # may indicate user went from one google search type to another ie search-->images	
+	return "$source\t\t$comment";
 }
 
 
@@ -644,20 +662,20 @@ sub parse_chips($){
 	if (@filters == 2){
 		$filters[0] =~ s/q://g;
 		$filters[1] =~ s/g_1://g;
-		$comment = "Initial query for '$filters[0]', then filtered by '$filters[1]'";
+		$comment = "(Initial query for '$filters[0]', then filtered by '$filters[1]')";
 	}
 	
 	if (@filters == 3){
 		$filters[0] =~ s/q://g;
 		$filters[1] =~ s/g_1://g;
 		$filters[2] =~ s/g_1://g;	
-		$comment = "Initial query for '$filters[0]', then filtered by '$filters[1]', and then '$filters[2]'";
+		$comment = "(Initial query for '$filters[0]', then filtered by '$filters[1]', and then '$filters[2]')";
 	}
 	
-
-	return "$chips\t\t($comment)";
+	return "$chips\t\t$comment";
 }
 
+# seen - 1
 sub parse_spell($){
 	my $spell = shift;
 	my $comment = "";
@@ -675,13 +693,8 @@ sub parse_spell($){
 sub parse_nfpr($){
 	my $nfpr = shift;
 	my $comment = "";
-	if ($nfpr eq "1"){
-		$comment = "search term spelled incorrectly, then \"Search instead for <provided search term>\" selected";
-	}
-	else{
-		$comment = "unknown";
-	}
-	return "$nfpr\t\t($comment)";
+	$comment = "(search term spelled incorrectly, then \"Search instead for <provided search term>\" selected)" if ($nfpr eq "1");
+	return "$nfpr\t\t$comment";
 }
 
 
@@ -702,15 +715,17 @@ sub parse_cr($){
 # rja - unsure
 sub parse_cad($){
 	my $cad = shift;
-	return "$cad\t\tseen unsure -- NOT IMPLEMENTED" if ($cad eq "rja");
-	return "$cad\t\t-- NOT IMPLEMENTED";
+	my $comment = "";
+	$comment = "" if ($cad eq "rja");
+	return "$cad\t\t$comment";
 }
 
 # seen value 2 so far
 sub parse_espv($){
 	my $espv = shift;
-	return "$espv\t\t seen -- NOT IMPLEMENTED" if ($espv eq "2");
-	return "$espv\t\t -- NOT IMPLEMENTED";
+	my $comment = "";
+	return "$espv\t\t(unknown)" if ($espv eq "2");
+	return "$espv\t\t$comment";
 }
 
 
@@ -727,9 +742,9 @@ sub parse_esrc($){
 # j - unsure
 sub parse_rct($){
 	my $rct = shift;
-	my $comment = "-- NOT IMPLEMENTED"; 
-	$comment = "unknown -- NOT IMPLEMENTED" if ($rct eq "j");
-	return "$rct\t\t($comment)";
+	my $comment = ""; 
+	$comment = "(unknown)" if ($rct eq "j");
+	return "$rct\t\t$comment";
 }
 
 
@@ -741,52 +756,62 @@ sub parse_rct($){
 # havent seen sa=N yet
 sub parse_sa($){
 	my $sa = shift;
-	my $comment = "unknown -- NOT IMPLEMENTED";
+	my $comment = "unknown";
 	$comment = "User clicked on related searches in the SERP. Also seen if user clicked on image search after initial search. Or filter selected from images.google.com" if ($sa eq "X");
 	$comment = "User searched - to confirm" if ($sa eq "N");
-	$comment = "unknown -- NOT IMPLEMENTED" if ($sa eq "t");
+	$comment = "unknown" if ($sa eq "t");
 	return "$sa\t\t($comment)";
 	
 }
 
 sub parse_uact($){
 	my $uact = shift;
-	return "$uact\t\t -- NOT IMPLEMENTED";
+	my $comment = "";
+	return "$uact\t\t$comment";
 }
 
 # iniital testing on chrome, logged in, shows ion means instant is turned on. but that doesn't mean it works if the computer/internet connection ? isnt fast enough
 sub parse_ion($){
 	my $ion = shift;
-	return "$ion\t\t -- Inital Testing indicated this means that Instant is on, however Instant may not always function depending on the setting" if ($ion eq "1");
-	return "$ion\t\t -- not implemented yet"
+	my $comment = "";
+	
+	if ($ion eq "1"){
+		$comment = "(Instant On)";
+		push @alerts, "ION: Inital Testing indicated this means that Instant is on, however Instant may not always function depending on the setting";
+	}
+	return "$ion\t\t$comment";
 }
 
 
 sub parse_usg($){
 	my $usg = shift;
-	my $comment = "Hash of referred URL";
-	return "$usg\t\t($comment)";
+	my $comment = "(Hash of referred URL)";
+	return "$usg\t\t$comment";
 }
 
 sub parse_pbx($){
 	my $pbx = shift;
-	return "$pbx\t\t -- NOT YET IMPLEMENTED"; # if ($pbx eq "1");
+	my $comment = "";
+	return "$pbx\t\t$comment";
 }
 
 sub parse_psig($){
 	my $psig = shift;
-	return "$psig\t\t -- NOT IMPLEMENTED";
+	my $comment = "";
+	return "$psig\t\t$comment";
 }
 
 
 sub parse_bav($){
 	my $bav = shift;
-	return "$bav\t\t -- NOT IMPLEMENTED";
+	my $comment = "";
+	return "$bav\t\t$comment";
 }
 
 sub parse_bvm($){
 	my $bvm = shift;
-	return "$bvm\t\t -- NOT IMPLEMENTED";
+	my $comment = "";
+	return "$bvm\t\t$comment";
 }
 
 
@@ -887,9 +912,11 @@ sub run_single_line_command($){
 #returns a modified unix timestamp
 sub modify_unix_timezone($){
 		my $unix = shift;
-		my $timezone_modifier = $config{timezone};
-		$timezone_modifier =~ s/\+//;	#remove the + if the user includes it, there's no other validation
-		
+		my $timezone_modifier = 0;
+		if ($config{timezone}){
+			$timezone_modifier = $config{timezone};
+			$timezone_modifier =~ s/\+//;	#remove the + if the user includes it, there's no other validation
+		}
 		my $timezone = $timezone_modifier * (60 * 60);
 		my $comment = "";
 		my $gm_unix = gmtime($unix+$timezone);
