@@ -2,9 +2,12 @@
 
 use strict;
 use Getopt::Long;
+use URI;
 use URI::Escape;
+use URI::Split qw(uri_split uri_join);
+use List::MoreUtils qw(uniq);
 
-my %parameters = {};
+my @parameters;
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
 GetOptions(\%config, qw(file|f=s help|?|h));
@@ -20,51 +23,28 @@ open (FH, "<", $file);
 foreach my $line (<FH>){
 	chomp $line;
 	next if (!defined($line));
+	#skip blank or commented out lines
+	
 	next if $line =~ m/^\#/;
 	next if $line =~ m/^$/;
 	
 	my ($url, $comment) = split /\|/, $line;
-	
-	$url =~ s/^http[s]:\/\///g if ($url =~ m/^http[s]:\/\//);
-	
-	#remove http://www.google.com.*/
-	my ($google, @rest) = split /\//, $url;
-	$url = join('\/', @rest) if ($rest[0]);
-	$url =~ s/\\\//\//g;
-		
-	#extract the term between google.com/___?
-	$url =~ s/(.*)\?//g;	
 
-	$url =~ s/\&|\#/\n/g;	
-	#remove spaces
-	$url =~ s/ //g;
+	#change # to & to remove "fragment"
+	$url =~ s/\#/\&/g;
+	
+	my $u = URI->new($url);
+	my ($scheme, $domain, $path, $query, $frag) = uri_split($u);
 
-	#print $url."\n";
-	#<STDIN>;
-	
-	next if $line =~ m/^$/;
-	
-	my @urlentries = split /\n/, $url;
-	
-		
-	#load hash with parameters
-	my $u;
-	foreach $u (@urlentries){
-		#print $u."\n";
-		$u =~ m/(.*)=(.*)/;
-		$parameters{$1} = 1;
-		#print $1."\n";
-		#$parameters{$1} = uri_unescape($2) if ($u =~ m/(.*)=(.*)/); # may need to run uri_unescape twice
-	}
-	#<STDIN>;
-	
+	my %query_parameters = $u->query_form($u);
+
+	push @parameters, keys %query_parameters;	
 }
 
-my @vals = sort keys %parameters;
-foreach my $v (@vals){
-	print $v."\n";
-}
 
+my @uniq = uniq @parameters;
+
+print join("\n", @uniq), "\n";
 
 sub _help {
 	print<< "EOT";
