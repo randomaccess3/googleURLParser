@@ -13,7 +13,7 @@ use List::MoreUtils qw(uniq);
 my %parameters;
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config, qw(file|f=s help|?|h));
+GetOptions(\%config, qw(file|f=s param|p=s help|?|h));
 
 if ($config{help} || !%config) {
 	_help();
@@ -76,16 +76,25 @@ foreach my $line (<FH>){
 
 #use Data::Dumper;
 #print Dumper \%parameters;
-
-
 my @uniq; 
 print "-------------------\n";
-foreach my $k (keys %parameters) {
+if ($config{param}){
+   my $k = $config{param};
    print "$k=\n";
    my @vals = @{$parameters{$k}};
    @uniq = uniq @vals;
    print join("\n", @uniq), "\n";
    print "-------------------\n";
+}
+else{
+	
+	foreach my $k (keys %parameters) {
+		print "$k=\n";
+		my @vals = @{$parameters{$k}};
+		@uniq = uniq @vals;
+		print join("\n", @uniq), "\n";
+		print "-------------------\n";
+	}
 }
 
 
@@ -99,6 +108,7 @@ sub _help {
 Print out list of unique parameters from a list of urls in GSERPant.pl input format
 
 -f|file ....... input file
+-p|param ...... specify parameter
 -h|help ....... prints this help screen
 
 No validation on the input
