@@ -1,27 +1,30 @@
 # googleURLParser
-parser for Google search strings
+Parser for Google search strings
+This tool came about to try and identify the data located within a Google URL.
+Using this script examiners may be able to understand a little bit more about how the user came to a certain page, or what their actions were. 
+
+Usage Example:
+perl GSERPent.pl -u "http://www.google.com"
+
 
 Install on Windows:
-ActiveState Perl
-ActiveState Python 2.7
-ppm install URI
-ppm install Text-ASCIITable
+Requires -  ActiveState Perl
+            ActiveState Python 2.7
+
+            ppm install URI
+            ppm install Text-ASCIITable
 
 Install on Mac:
 cpan Text::ASCIITable
 
-Tools:
-GSERPent.pl - Google URL parser - run -h for help and usage instructions
-  - perl GSERPent.pl -u "url"
-
 Helper Scripts:
-IEF_TSV_to_list.pl - converts IEF's TSV output into a list that can be injested with the -f option in GSERPent. To be merged into main program
+* IEF_Google_Searches_TSV_to_list.pl - converts IEF's TSV output from the Google Searches section into a list that can be injested with the -f option in GSERPent.
+* get_all_parameters.pl - given a list of Google URLs, provide a list of all of the parameters
+* parameter_values.pl - given a list of Google URLs, provide a list of all of the parameters, and the grouped values
+* testGSERPent.pl - run test cases, not really populated
+* uridecode.pl - split URLs by & and # value
+* convertTime.pl - command line unix timestamp converter
 
-get_all_parameters.pl - takes a list of urls and output's the unique parameters
 
-uridecode.pl - just basic uri decode of a url
-
-TO DO:
-Update GSERPent to fix url input parsing
-Improve parsing of parameters after the #
-Merge IEF_TSV_to_list into main program
+Known Issues: 
+* Doesn't parse the data in the fragment (after the #)
