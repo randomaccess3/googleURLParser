@@ -47,9 +47,10 @@
 # 20170313	- fix up timezone_modifier code
 # 20170314	- fixed timezone_modifier code again, and removed 'not implemented' comments of routines
 #			- removed unnecessary prints when param argument is entered
+# 20170403  - various updates to alerts, add initial wrapper for wrapid
 
 
-my $VERSION = "20170314";
+my $VERSION = "20170403";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -178,7 +179,7 @@ sub parse_URL($){
 	# ALERTS
 	
 	push @alerts, "/URL: Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
-	push @alerts, "/IMGRES: Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't appear in the task bar or internet history" if ($path eq "/imgres");
+	push @alerts, "/IMGRES: Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't always appear in the task bar or internet history" if ($path eq "/imgres");
 	push @alerts, "URL taken from cache - haven't tested the parsing" if ($path eq "/gen_204" || $path eq "/complete/search");	
 	
 	
@@ -206,7 +207,7 @@ sub parse_URL($){
 	}
 	
 	if (exists($parameters{"ved"}) && exists($parameters{"spell"})){
-		push @alerts, "VED: If time is present this indicates the time that the user selected the correct spelling of the searched term";
+		push @alerts, "VED: If time is present this may indicate the time that the user selected the correct spelling of the searched term";
 	}
 	
 	# PARSE PARAMETERS
@@ -260,6 +261,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_chips($parameters{$u}) if ($u eq "chips");
 		$parameters{$u} = parse_authuser($parameters{$u}) if ($u eq "authuser");
 		$parameters{$u} = parse_spell($parameters{$u}) if ($u eq "spell");
+		$parameters{$u} = parse_wrapid($parameters{$u}) if ($u eq "wrapid");
 		$parameters{$u} = parse_nfpr($parameters{$u}) if ($u eq "nfpr");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
@@ -341,6 +343,14 @@ sub parse_PSI($){
 	my $comment = "$ei,$unix,$unknown";
 	return "$psi\t\t($comment)";
 }
+
+# Contains a timestamp, unsure what it means, or how to generate it
+sub parse_wrapid($){
+	my $wrapid = shift;
+	my $comment = "Unsure what this means, contains unix timestamp";
+	return "$wrapid\t\t($comment)";
+}
+
 
 #indicates the start of a session
 #can reliably get this value if you go to Google's homepage on chrome, and when a new tab/window is opened on a navigation number at the bottom of a search
@@ -520,7 +530,7 @@ sub parse_tbm($){
 	return "$tbm\t\t(Video Search}" if ($tbm eq "vid");
 	return "$tbm\t\t(News Search}" if ($tbm eq "nws");
 	return "$tbm\t\t(Books Search}" if ($tbm eq "books");
-	return "$tbm\t\t(Shopping Search}" if ($tbm eq "shopping");
+	return "$tbm\t\t(Shopping Search}" if ($tbm eq "shop");
 	return $tbm;
 }
 
@@ -892,7 +902,7 @@ sub parse_VED($){
 	if ($comment =~ m/.*ts: (\d*).*/){
 	 	my $unix = substr($1, 0, 10);
 		$comment = "(".modify_unix_timezone($unix).")";
-		push @alerts, "VED: There are other parameters, the timestamp is the only one I currently extract";
+		push @alerts, "VED: Only timestamp extracted. For other paramaters run ved.py. Unsure what timestamp means, sometimes it's accurate, sometimes it isn't";
 	}
 return "$ved\t\t$comment\n";
 }
