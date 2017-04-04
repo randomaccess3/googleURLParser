@@ -48,6 +48,7 @@
 # 20170314	- fixed timezone_modifier code again, and removed 'not implemented' comments of routines
 #			- removed unnecessary prints when param argument is entered
 # 20170403  - various updates to alerts, add initial wrapper for wrapid
+# 20170404  - fix gfe_rd, update alert for redirect, update to source, update to ust alert
 
 
 my $VERSION = "20170403";
@@ -178,7 +179,7 @@ sub parse_URL($){
 
 	# ALERTS
 	
-	push @alerts, "/URL: Redirect link, usually indicating opening in new tab/window. Query will most often be blank" if ($path eq "/url");
+	push @alerts, "/URL: FF/Chrome/Safari - Redirect link, usually indicating opening in new tab/window. Query will most often be blank.\n/URL: On IE/Edge this appears from clicking a link, rather than opening a new tab" if ($path eq "/url");
 	push @alerts, "/IMGRES: Imgres shows up if you right click on a picture in image search and save the url. The URL doesn't always appear in the task bar or internet history" if ($path eq "/imgres");
 	push @alerts, "URL taken from cache - haven't tested the parsing" if ($path eq "/gen_204" || $path eq "/complete/search");	
 	
@@ -195,7 +196,7 @@ sub parse_URL($){
 	# UST parameter appears to relate to when Gmail was opened if it's in a redirect link from gmail	
 	if (exists($parameters{"ust"})){
 		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after Gmail was opened." if ($parameters{"source"} eq "gmail");
-		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after when the image search was conducted." if ($parameters{"source"} eq "images");
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating when the image search was conducted." if ($parameters{"source"} eq "images");
 	}
 	
 	if (exists($parameters{"EI"})){
@@ -391,7 +392,7 @@ sub parse_SEI($){
 
 sub parse_GFE_RD($){
 	my $gfe_rd = shift;
-	return "$gfe_rd\t\t(Country Redirect - Direct to your countries Google homepage)" if ($gfe_rd eq "cr");
+	return "$gfe_rd\t\t(Country Redirect - Redirect to your country's Google homepage)" if ($gfe_rd eq "cr");
 	return $gfe_rd;
 }
 
@@ -601,6 +602,7 @@ sub parse_source($){
 	$comment = "(Web - standard browser search)" if ($source eq "web");
 	$comment = "(Clicked on link from Gmail)" if ($source eq "gmail");
 	$comment = "(Clicked link from Image Search)" if ($source eq "images");
+	$comment = "(Clicked link from Video Search)" if ($source eq "video");
 	$comment = "(seen - Unknown)" if ($source eq "lnt");
 	$comment = "(Click on Google Search through chrome://apps)" if ($source eq "search_app");
 	$comment = "(Home Page)" if ($source eq "hp"); #may indicate the user searched from the homepage ie images.google.com
