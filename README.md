@@ -9,6 +9,9 @@ Requires -  Perl, and Python
 ## Usage Example:
 
 perl GSERPent.pl -u "http://www.google.com"
+perl GSERPent.pl -f input.txt
+
+List input formatting allows for [link] | [comment] and ignores lines starting with #
 
 ## Perl Libraries Required
 Windows
