@@ -1,5 +1,7 @@
 # googleURLParser - GSERPent
+
 Parser for Google search strings
+
 This tool came about to try and identify the data located within a Google URL.
 Using this script examiners may be able to understand a little bit more about how the user came to a certain page, or what their actions were. 
 
