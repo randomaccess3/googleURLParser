@@ -11,7 +11,7 @@ Requires -  Perl, and Python
 * perl GSERPent.pl -u "http://www.google.com"
 * perl GSERPent.pl -f input.txt
 
-List input formatting allows for [link] | [comment] and ignores lines starting with #
+List input formatting expects [link] | [comment] and ignores lines starting with #
 
 ## Perl Libraries Required
 Windows
