@@ -49,9 +49,10 @@
 #			- removed unnecessary prints when param argument is entered
 # 20170403  - various updates to alerts, add initial wrapper for wrapid
 # 20170404  - fix gfe_rd, update alert for redirect, update to source, update to ust alert
+# 20170410  - fix sourceid output, fix framgent formatting, rls parameter & alerts
 
 
-my $VERSION = "20170403";
+my $VERSION = "20170410";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -173,7 +174,7 @@ sub parse_URL($){
 	
 	my $u = URI->new($url);
 	my ($scheme, $domain, $path, $query, $frag) = uri_split($u);
-	
+	$frag =~ s/\&/\n\t\t/;
 	# load parameters (split by &)
 	my %parameters = $u->query_form($u);
 
@@ -186,7 +187,7 @@ sub parse_URL($){
 	
 	# If a fragment (hash) exists in the URL then the previous search was before the hash and the current search was in the q after the hash
 	# Sometimes google won't add the #, and just recreates the query again
-	push @alerts, "# indicates second search - not implemented currently.\nFragment = $frag" if ($frag);
+	push @alerts, "# indicates second search - not implemented currently.\nFragment = \n\t\t$frag" if ($frag);
 
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
@@ -209,6 +210,14 @@ sub parse_URL($){
 	
 	if (exists($parameters{"ved"}) && exists($parameters{"spell"})){
 		push @alerts, "VED: If time is present this may indicate the time that the user selected the correct spelling of the searched term";
+	}
+	
+	
+	# rls in IE only appears when you search from the address bar. and gs_l only appears when you search from the google search bar.
+	# As a result if the rls parameter is in the URL it means that the user most likely searched from the address bar, and then modified the search
+	# in the google results search box
+	if (exists($parameters{"rls"}) && exists($parameters{"gs_l"})){
+		push @alerts, "Most likely a secondary search";
 	}
 	
 	# PARSE PARAMETERS
@@ -264,6 +273,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_spell($parameters{$u}) if ($u eq "spell");
 		$parameters{$u} = parse_wrapid($parameters{$u}) if ($u eq "wrapid");
 		$parameters{$u} = parse_nfpr($parameters{$u}) if ($u eq "nfpr");
+		$parameters{$u} = parse_rls($parameters{$u}) if ($u eq "rls");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
@@ -442,11 +452,24 @@ sub parse_authuser($){
 
 sub parse_sourceid($){
 	my $sourceid = shift;
-	return "$sourceid\t\t(Google Chrome)" if ($sourceid eq "chrome");
-	return "$sourceid\t\t(Google Chrome - Instant Enabled)" if ($sourceid eq "chrome-instant");
-	return "$sourceid\t\t(Google Chrome - Instant Enabled? unsure)" if ($sourceid eq "chrome-psyapi2");
-	return "$sourceid\t\t(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
-	return "$sourceid\t\t(Opera)" if ($sourceid eq "opera");
+	my $comment = "";
+	$comment = "(Google Chrome)" if ($sourceid eq "chrome");
+	$comment = "(Google Chrome - Instant Enabled)" if ($sourceid eq "chrome-instant");
+	$comment = "(Google Chrome - Instant Enabled? unsure)" if ($sourceid eq "chrome-psyapi2");
+	$comment = "(Google Chrome Mobile)" if ($sourceid eq "chrome-mobile");
+	$comment = "(Opera)" if ($sourceid eq "opera");
+	if ($sourceid eq "ie7" || $sourceid eq "ie8"){
+		push @alerts, "SOURCEID: Not indicative of version of IE";
+		# The following reference is listed in HKEY_CURRENT_USER\Software\Microsoft\Internet Explorer\SearchScopes\{97312F68-F26E-45DA-B0D9-E02A27222048}
+		# URL = https://www.google.com/search?q={searchTerms}&sourceid=ie7&rls=com.microsoft:{language}:{referrer:source}&ie={inputEncoding?}&oe={outputEncoding?}
+		# As shown ie7 is hardcoded as part of the addon.
+		# Similarly urls found in cache would indicate ie8 
+		# SuggestionsURL = https://www.google.com/complete/search?q={searchTerms}&client=ie8&mw={ie:maxWidth}&sh={ie:sectionHeight}&rh={ie:rowHeight}&inputencoding={inputEncoding}&outputencoding={outputEncoding}
+		
+		$comment = "(Internet Explorer)";
+	}
+	
+	return "$sourceid\t\t$comment";
 }
 
 #identified firefox-a on https://googlesystem.blogspot.com.au/2006/07/meaning-of-parameters-in-google-query.html, but haven't researched it yet
@@ -523,6 +546,16 @@ sub parse_rlz($){
 	my $rlz = shift;
 	return $rlz."\t\tunknown";
 }
+
+sub parse_rls($){
+	my $rls = shift;
+	my $comment = "";
+	$comment = "(Search from Address Bar)" if ($rls eq "com.microsoft:en-AU:IE-Address");
+	$comment = "(Google Search Suggestion selected from Address Bar)" if ($rls eq "com.microsoft:en-AU:IE-SearchBox");
+	return $rls."\t\t$comment";
+}
+
+
 
 # Search engine type
 sub parse_tbm($){
@@ -750,29 +783,34 @@ sub parse_esrc($){
 }
 
 
-# seen values 
-# j - unsure
+# Only seen the value "j" unsure what it means
 sub parse_rct($){
 	my $rct = shift;
 	my $comment = ""; 
-	$comment = "(unknown)" if ($rct eq "j");
+	$comment = "(Only ever seen the value j - unsure what it means)" if ($rct eq "j");
 	return "$rct\t\t$comment";
 }
 
 
 # “sa=N”: User searched and “sa=X”: User clicked on related searches in the SERP).
 # http://www.t75.org/2012/06/deconstructing-googles-url-search-parameters/
-# confirmed the sa=X, this so far has only been seen when saving the link from a related search (or if you open it in a new tab)
+# sa=x appears if the user clicks on the links in the "Search related to <search term>"
 # If a user goes to images.google.com directly and then filters the results then sa=x
 # usually when opening a result in a new tab from the SERP you'll see sa=t
-# havent seen sa=N yet
+# sa=N is seen when the user clicks on the next page
+
+# Possible options include: t, X, 1, N, i
+
+
 sub parse_sa($){
 	my $sa = shift;
-	my $comment = "unknown";
-	$comment = "User clicked on related searches in the SERP. Also seen if user clicked on image search after initial search. Or filter selected from images.google.com" if ($sa eq "X");
-	$comment = "User searched - to confirm" if ($sa eq "N");
-	$comment = "unknown" if ($sa eq "t");
-	return "$sa\t\t($comment)";
+	my $comment = "";
+	$comment = "(User clicked on related searches in the SERP. Also seen if user clicked on images after initial search. Or filter selected from images.google.com)" if ($sa eq "X");
+	$comment = "(Selected next page)" if ($sa eq "N");
+	$comment = "(Seen in redirect from image search)" if ($sa eq "i");
+	
+	#$comment = "(unknown)" if ($sa eq "t");
+	return "$sa\t\t$comment";
 	
 }
 
