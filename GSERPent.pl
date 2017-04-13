@@ -50,9 +50,9 @@
 # 20170403  - various updates to alerts, add initial wrapper for wrapid
 # 20170404  - fix gfe_rd, update alert for redirect, update to source, update to ust alert
 # 20170410  - fix sourceid output, fix framgent formatting, rls parameter & alerts
+# 20170413  - update alert for fragment
 
-
-my $VERSION = "20170410";
+my $VERSION = "20170413";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -66,12 +66,8 @@ my $VERSION = "20170410";
 #To Install OS X
 # cpan Text::ASCIITable
 
-#To do ; put in download code for EI parser and ved decoder, updated ved decoder to use install protobuf rather than lib directory
-# separate # from URL as it denotes a second search
-# probably port to python
-
 # Known bug
-# Doesnt deal with # in search
+# Doesnt deal with parameters in fragment
 # Doesn't remove +'s in q or oq value
 
 # Research
@@ -187,7 +183,7 @@ sub parse_URL($){
 	
 	# If a fragment (hash) exists in the URL then the previous search was before the hash and the current search was in the q after the hash
 	# Sometimes google won't add the #, and just recreates the query again
-	push @alerts, "# indicates second search - not implemented currently.\nFragment = \n\t\t$frag" if ($frag);
+	push @alerts, "Fragment can sometimes indicate a second search - parameter parsing not currently implemented, however fragment displayed below.\nFragment = \n\t\t$frag" if ($frag);
 
 	#If the q and oq exist and arent equal
 	if (exists($parameters{"q"}) && (exists($parameters{"oq"})) && ($parameters{"q"} ne $parameters{"oq"})){
