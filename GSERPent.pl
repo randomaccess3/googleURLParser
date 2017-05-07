@@ -51,8 +51,10 @@
 # 20170404  - fix gfe_rd, update alert for redirect, update to source, update to ust alert
 # 20170410  - fix sourceid output, fix framgent formatting, rls parameter & alerts
 # 20170413  - update alert for fragment
+# 20170501  - update ust alert and gs_l parameter
+# 20170507  - continued updating gs_l parameter
 
-my $VERSION = "20170413";
+my $VERSION = "20170507";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -104,8 +106,6 @@ GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s history|
 
 our @alerts = ();
 #our %parameters = {};
-
-
 
 if ($config{help} || !%config) {
 	_help();
@@ -193,7 +193,7 @@ sub parse_URL($){
 	# UST parameter appears to relate to when Gmail was opened if it's in a redirect link from gmail	
 	if (exists($parameters{"ust"})){
 		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after Gmail was opened." if ($parameters{"source"} eq "gmail");
-		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating when the image search was conducted." if ($parameters{"source"} eq "images");
+		push @alerts, "UST: In testing I have found the UST timestamp to be a Google-server timestamp indicating 24 hours after the image search was conducted." if ($parameters{"source"} eq "images");
 	}
 	
 	if (exists($parameters{"EI"})){
@@ -214,6 +214,10 @@ sub parse_URL($){
 	# in the google results search box
 	if (exists($parameters{"rls"}) && exists($parameters{"gs_l"})){
 		push @alerts, "Most likely a secondary search";
+	}
+	
+	if (exists($parameters{"gs_l"})){
+		push @alerts, "GS_L: User searched using search bar";
 	}
 	
 	# PARSE PARAMETERS
@@ -295,7 +299,11 @@ sub parse_URL($){
 		$t->alignCol('Parameter','left');
 		$t->alignCol('Value','left');
 		$t->alignCol('Comment','left');
-		
+				
+		#$t->setColWidth('Value', 50);
+		#$t->setColWidth('Comment', 50);
+		#$t->setColWidth('Comment', $config{table}) if ($config{table});
+
 		#load new hash and move the key from name, value+comment, to name+value, comment
 		my $param_name;
 		foreach $param_name (sort keys %parameters){
@@ -890,27 +898,104 @@ sub parse_dpr($){
 
 
 # further testing required for characters typed and deleted. so far it looks like val[9] indicates a change in the number of characters
-# if searched from the images.google.com it starts with img
+
+# Parameter 0 - where the searcher came from: image search, home page, SERP
+# Parameter 1 - how they selected the search query from the dropdown list. If no value exists they did not select the value from the dropdown list.
+# Parameter 2 - which entry on the list was selected
+# Parameter 4 - Time in milliseconds between the current SERP and the new search commencing
+# Parameter 5 - Time in milliseconds between the current SERP and the new search being selected.
+# Parameter 7 - Time in milliseconds between the current and previous SERP being loaded
+# Parameter 8 - Characters pressed (excluding enter, but including backspace/delete), except on the homepage in Chrome, which is +1 for some reason
+# Parameter 26 - whether the user typed the query, or a suggestion was selected without the user typing
+
 sub parse_gs_l($){
 	my $gs_l = shift;
 	my @vals = split /\./, $gs_l;
 	my $comment = "";
 	
-	$comment .= "(mouse-click on suggestion)" if ($vals[1] eq "1");
-	$comment .= "(keyboard [enter] key)" if ($vals[1] eq "3");
-	$comment .= "(Google Instant Search)" if ($vals[1] eq "10");
+	my %param_0 = (
+		"hp"  => "Home Page",
+		"serp" => "Search Engine Results Page",
+		"img"  => "Image Search",
+	);
 	
-	$comment .= "(".ordinal($vals[2]+1). " entry selected)" if ($vals[2]);	
-		$comment .= "(Characters changed, more testing required" if ($vals[9]);
-    
-	#$comment .= "(".$vals[7]." may indicate time it takes to get from getting to google to submitting the search, further testing required)" if ($vals[7]);
+	# How the user selected the search term
+	my %param_1 = (
+		"1" => "mouse-click on suggestion",
+		"3" => "keyboard [enter] key",
+		"10" => "Google Instant Search (untested)",
+	);
+	
+	
+	#Paramater 0
+	#if the value ($val[0]) exists in the hash of values for param_0 then add it's explanation to the comment
+	$comment .= "($param_0{$vals[0]})" if exists ($param_0{$vals[0]});  
 
-	#$comment .= "(May indicate - ".$vals[9]." characters changed" if ($vals[9]);   
-    #$comment .= "(May indicate - ".$vals[10]." characters deleted" if ($vals[10]);		
+	#Paramater 1
+	if (exists ($param_1{$vals[1]})){
+		$comment .= "($param_1{$vals[1]})";
+	}
+	else{
+		$comment .= "(Query not selected from suggestions)";
+	}
 	
-	#$comment .= ")";
+	#Paramater 2
+	$comment .= "(Item ".($vals[2]+1)." on list selected)" if ($vals[2]);
+	
+	#Paramater 4
+	if ($vals[4]){
+		if ($vals[4] eq 0){
+			$comment .= "(Suggestion clicked on)";
+		}
+		else{
+			$comment .= "(".$vals[4]." milliseconds between the current SERP and the new search commencing)";
+		}
+	}
+	
+	#Parameter 5
+	if ($vals[5]){
+		if ($vals[5] eq 0){
+			$comment .= "(Suggestion clicked on)";
+		}
+		else{
+			my $time_typing = $vals[5]-$vals[4];
+			$comment .= "(".$vals[5]." milliseconds between the current SERP and the new search being selected. ".$time_typing." milliseconds typing query)";
+		}
+	}
+	
+	#Parameter 7
+	if ($vals[7] ne ""){
+		$comment .= "(". $vals[7]." milliseconds between the current and previous SERP being loaded)";
+	}
+	
+	#Parameter 8
+	if ($vals[8] ne ""){
+		if ($vals[8] eq 0){
+			$comment .= "(No characters typed)";
+		}
+		else {
+			if ($vals[0] eq "hp"){
+				$comment .= "(".$vals[8]. " keys pressed | In Chrome this is +1)";
+			}
+			else {
+				$comment .= "(".$vals[8]." keys pressed)";
+			}
+		}
+	}
+	
+	#Parameter 26
+	if ($vals[26]){
+		if ($vals[26] eq "1"){
+			$comment .= "(User typed)";
+		}
+		elsif ($vals[26] eq ""){
+			$comment .= "(Suggestion was selected without the user typing)";
+		}
+	}
+    
+
 	$comment =~ s/\)\(/, /g;
-	return $gs_l."\t\t". $comment. "-- IN PROGRESS";
+	return $gs_l."\t\t". $comment;
 }
 
 
