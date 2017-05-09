@@ -53,7 +53,7 @@
 # 20170413  - update alert for fragment
 # 20170501  - update ust alert and gs_l parameter
 # 20170507  - continued updating gs_l parameter
-# 20170509  - fixed table output and updated help, updated gs_l typing times
+# 20170509  - fixed table output and updated help, updated gs_l typing times, added OI parameter
 
 my $VERSION = "20170509";
 
@@ -275,6 +275,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_wrapid($parameters{$u}) if ($u eq "wrapid");
 		$parameters{$u} = parse_nfpr($parameters{$u}) if ($u eq "nfpr");
 		$parameters{$u} = parse_rls($parameters{$u}) if ($u eq "rls");
+		$parameters{$u} = parse_oi($parameters{$u}) if ($u eq "oi");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
@@ -570,6 +571,15 @@ sub parse_rls($){
 	return $rls."\t\t$comment";
 }
 
+sub parse_oi($){
+	my $oi = shift;
+	my $comment = "";
+	if ($oi eq "ddle"){
+		$comment = "(Google Doodle Selected)"; 
+		push @alerts, "OI: User didn't type the search term but instead the Google Doodle was selected";
+	}
+	return $oi."\t\t$comment";
+}
 
 
 # Search engine type
