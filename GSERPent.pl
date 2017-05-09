@@ -53,8 +53,9 @@
 # 20170413  - update alert for fragment
 # 20170501  - update ust alert and gs_l parameter
 # 20170507  - continued updating gs_l parameter
+# 20170509  - fixed table output and updated help, updated gs_l typing times
 
-my $VERSION = "20170507";
+my $VERSION = "20170509";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -63,7 +64,7 @@ my $VERSION = "20170507";
 # Requires cheeky4n6monkey/4n6-scripts/master/google-ei-time to be in the same folder
 # Requires https://github.com/TomAnthony/ved-decoder/ which is an updated forked parser originally written by Benjamin Schulz (https://github.com/beschulz) to be extracted into the same directory (ved-decoder-master)
 # pip install protobuf to use the ved-decoder (although there is a version of protobuf included so might not be required to install)
-
+# pip install six
 
 #To Install OS X
 # cpan Text::ASCIITable
@@ -101,7 +102,7 @@ use Text::ASCIITable;
 
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t timezone|tz=s history|hist help|?|h));
+GetOptions(\%config,qw(url|u=s file|f=s param|p=s table|t:s timezone|tz=s history|hist help|?|h));
 
 
 our @alerts = ();
@@ -285,31 +286,38 @@ sub parse_URL($){
 		$parameters{$u} .= "\t\t(Show results for location)" if ($u eq "gl");   #joostdevalk.nl - google websearch parameters
 		$parameters{$u} .= "\t\t(Usually indicates that this was opened in a new tab/window from the Search Results page)" if ($u eq "url");
 		
-		print "$u=$parameters{$u}\n" if (!$config{table});
+		print "$u=$parameters{$u}\n" if (!(defined $config{table}));
 		
 	}
+		
+	my $value_colwidth = 40;
+	my $comment_colwidth = 50;
 	
-	#printDivider();
-	#print scalar(@alerts)."\n";
-	#printDivider();
+	# Table has an optional width value for the comment column, if none provided then the width is set to 50
+	if (defined $config{table}){
 	
-	if ($config{table}){
+		$comment_colwidth = $config{table} if ($config{table});
+	
 		my $t = Text::ASCIITable->new();
 		$t->setCols('Parameter','Value','Comment');
 		$t->alignCol('Parameter','left');
 		$t->alignCol('Value','left');
 		$t->alignCol('Comment','left');
-				
-		#$t->setColWidth('Value', 50);
-		#$t->setColWidth('Comment', 50);
-		#$t->setColWidth('Comment', $config{table}) if ($config{table});
-
+		
+		
+		$t->setColWidth('Value', $value_colwidth,1);
+		$t->setColWidth('Comment', $comment_colwidth,1);
+		
 		#load new hash and move the key from name, value+comment, to name+value, comment
 		my $param_name;
 		foreach $param_name (sort keys %parameters){
 			next if (!defined($parameters{$param_name}));	
 			$parameters{$param_name} =~ s/\t\t/\t/g; #replace the double tab with a single tab
 			my ($param_value, $param_comment) = split /\t/, $parameters{$param_name}; #split the parameter value with the comment
+			
+			$param_value = wrap($param_value, $value_colwidth); #wrap is required so that the data isn't cut off
+			$param_comment = wrap($param_comment, $comment_colwidth);
+			
 			$t->addRow($param_name,$param_value,$param_comment);
 		}
 		print $t;
@@ -327,6 +335,9 @@ sub parse_URL($){
 	@alerts = "";
 	return;
 }
+
+
+
 
 # found when examining the cache files. so far seen on chrome havent tested anything else
 # it seems that the two timestamps are different but not sure why
@@ -902,9 +913,9 @@ sub parse_dpr($){
 # Parameter 0 - where the searcher came from: image search, home page, SERP
 # Parameter 1 - how they selected the search query from the dropdown list. If no value exists they did not select the value from the dropdown list.
 # Parameter 2 - which entry on the list was selected
-# Parameter 4 - Time in milliseconds between the current SERP and the new search commencing
-# Parameter 5 - Time in milliseconds between the current SERP and the new search being selected.
-# Parameter 7 - Time in milliseconds between the current and previous SERP being loaded
+# Parameter 4 - Time in milliseconds between the current SERP and the new search commencing - time before search box selected
+# Parameter 5 - Time in milliseconds between the current SERP and the new search being selected. - time before user stopped typing search
+# Parameter 7 - Time in milliseconds between the current and previous SERP being loaded - total time on page
 # Parameter 8 - Characters pressed (excluding enter, but including backspace/delete), except on the homepage in Chrome, which is +1 for some reason
 # Parameter 26 - whether the user typed the query, or a suggestion was selected without the user typing
 
@@ -948,7 +959,7 @@ sub parse_gs_l($){
 			$comment .= "(Suggestion clicked on)";
 		}
 		else{
-			$comment .= "(".$vals[4]." milliseconds between the current SERP and the new search commencing)";
+			$comment .= "(".$vals[4]." milliseconds before selecting search box)";
 		}
 	}
 	
@@ -959,13 +970,13 @@ sub parse_gs_l($){
 		}
 		else{
 			my $time_typing = $vals[5]-$vals[4];
-			$comment .= "(".$vals[5]." milliseconds between the current SERP and the new search being selected. ".$time_typing." milliseconds typing query)";
+			$comment .= "(".$vals[5]." milliseconds on page before completed typing. ".$time_typing." milliseconds typing query)";
 		}
 	}
 	
 	#Parameter 7
 	if ($vals[7] ne ""){
-		$comment .= "(". $vals[7]." milliseconds between the current and previous SERP being loaded)";
+		$comment .= "(". $vals[7]." milliseconds on page in total)";
 	}
 	
 	#Parameter 8
@@ -1094,6 +1105,17 @@ sub printDivider{
 	print $text."\n";
 }
 
+# wrap(string, width);
+# couldn't get asciitable's wrap function to work
+# this isn't great, but it seems to work
+sub wrap($$){
+	my $text = shift;
+	my $width = shift;
+	$text =~ s/(.{1,$width})/$1\n/gs;
+	return $text;
+}
+
+
 #CPAN module - use Lingua::EN::Numbers::Ordinate;
 #http://stackoverflow.com/questions/11369907/how-do-i-retrieve-an-integers-ordinal-suffix-in-perl-like-st-nd-rd-th
 sub ordinal {
@@ -1103,14 +1125,17 @@ sub ordinal {
 sub _help {
 	print<< "EOT";
 GSERPent v.$VERSION - Google URL Parser
-GSERPent [-u url] [-f file] [-p param] [-t] [-tz] [-h]
+
 Parses Google Search and Redirect URLs to provide additional data
+
+Usage: GSERPent [-u url] [-f file] [-p param] [-t [comment column width]] [-tz] [-h]
+
   -u|url ............Single URL
   -f|file ...........Read a list of URLS
   -p|param ..........Print only supplied parameter
-  -t|table ..........Table output
+  -t|table ..........Table output, as well as optional column width for the Comment column
   -hist|history .....Store executed URLs in history.txt
-  -tz|timezone ......Timezone modifier (ie +5, -5) -- currently only available for the UST parameter
+  -tz|timezone ......Timezone modifier (ie +5, -5)
   -h.................Help
   
 Lists: Required format is URL|Comment. The comment will be included in the output
