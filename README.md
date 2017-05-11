@@ -4,6 +4,7 @@
 
 This tool came about to try and identify the data located within a Google URL.
 Using this script examiners may be able to understand a little bit more about how the user came to a certain page, or what their actions were. 
+You can view the webcast (and download the slides) for the presentation I did on 11th May 2017 here: https://www.sans.org/webcasts/wwwgooglecom-searchqwhat-plus-does-plus-this-plus-all-plus-mean-104857
 Requires -  Perl, and Python
 
 ## Usage Example:
