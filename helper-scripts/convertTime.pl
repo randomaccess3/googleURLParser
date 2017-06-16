@@ -1,25 +1,50 @@
 # convert time
 
+# adding loop for continuous input
+
+
 use Getopt::Long;
 
 my %config;
 Getopt::Long::Configure("prefix_pattern=(-|\/)");
-GetOptions(\%config,qw(unix|u=s timezone|tz=s help|?|h));
+GetOptions(\%config,qw(unix|u=s timezone|tz=s loop|l help|?|h));
 
-if ($config{unix}){
-	my $unix = $config{unix};
+
+
+
+#my $name = <STDIN>;
+my $unix = $config{unix} if ($config{unix}); 
+
+while (1){
+	printUnix($unix) if ($unix);
+	
+	if ($config{loop}){
+		print "\n";
+		$unix = <>;
+		chomp $unix;
+		last if ($unix eq "q");		# quit if the user types q
+	}
+	else{
+		last;	
+	}
+}
+
+
+
+if ($config{help} || !%config) {
+	_help();
+	exit;
+}
+
+sub printUnix($){
+	my $unix = shift;
 	
 	if ($config{timezone}){
 		print modify_unix_timezone($unix);
 	}
 	else{
-		print "$unix = ".gmtime($unix)."\n";
+		print "$unix = ".gmtime($unix);
 	}
-}
-
-if ($config{help} || !%config) {
-	_help();
-	exit;
 }
 
 
@@ -30,6 +55,7 @@ convertTime [-u time] [-h]
 Convert timestamps
   -u|unix ...........Unix timestamp
   -tz|timezone ......Timezone modifier (ie +5, -5)
+  -l|loop ...........Loop infinitely
   -h.................Help
 EOT
 }
