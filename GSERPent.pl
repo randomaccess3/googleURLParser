@@ -54,8 +54,9 @@
 # 20170501  - update ust alert and gs_l parameter
 # 20170507  - continued updating gs_l parameter
 # 20170509  - fixed table output and updated help, updated gs_l typing times, added OI parameter
+# 20171106  - added RLZ parameter (see notes above routine), fixed cr parameter bug, 
 
-my $VERSION = "20170509";
+my $VERSION = "20171106";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -556,11 +557,12 @@ sub parse_aqs($){
 	return "$aqs\t\t$comment";
 }
 
-#https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
-# language and encoding information
+#http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.258.9190&rep=rep1&type=pdf - Chrome RLZ and Unknown Features
+# "The RLZ information includes a non-unique promotional tag that contains information about how Chrome was obtained, the week when Chrome was installed, and the week when the first search was performed"
+# https://blog.chromium.org/2010/06/in-open-for-rlz.html
 sub parse_rlz($){
 	my $rlz = shift;
-	return $rlz."\t\tunknown";
+	return $rlz."\t\(see source: language and country settings)";
 }
 
 sub parse_rls($){
@@ -773,11 +775,10 @@ sub parse_nfpr($){
 # list is probably here: https://developers.google.com/adwords/api/docs/appendix/geotargeting
 sub parse_cr($){
 	my $cr = shift;
+	return "$cr\t\t(Empty)" if ($cr eq "");
 	
-	return "$cr\t\tEmpty" if ($cr eq "");
-	
-	$cr =~ s/Country(..)//g;	
-	return	"Country$1 (Country: $1)" ; 
+	$cr =~ s/country(..)//g;
+	return	"Country$1\t\t(Country: $1)" ; 
 }
 
 
