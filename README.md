@@ -22,6 +22,10 @@ Windows
 Mac
 - cpan Text::ASCIITable
 
+Linux (debian)
+- sudo apt install build-essentials
+- sudo cpan Text::ASCIITable
+
 ### Helper Scripts:
 * IEF_Google_Searches_TSV_to_list.pl - converts IEF's TSV output from the Google Searches section into a list that can be injested with the -f option in GSERPent.
 
