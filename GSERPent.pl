@@ -55,8 +55,9 @@
 # 20170507  - continued updating gs_l parameter
 # 20170509  - fixed table output and updated help, updated gs_l typing times, added OI parameter
 # 20171106  - added RLZ parameter (see notes above routine), fixed cr parameter bug, 
+# 20190909  - added sxsrf parsing routine and change datetime presentation
 
-my $VERSION = "20171106";
+my $VERSION = "20190909";
 
 #To Install Windows
 # ppm install URI (which I think comes with perl now)
@@ -93,7 +94,7 @@ use URI;
 use URI::Escape;
 use URI::Split qw(uri_split uri_join);
 use strict;
-
+use POSIX qw(strftime);
 use Getopt::Long;
 use File::Spec;
 
@@ -277,6 +278,7 @@ sub parse_URL($){
 		$parameters{$u} = parse_nfpr($parameters{$u}) if ($u eq "nfpr");
 		$parameters{$u} = parse_rls($parameters{$u}) if ($u eq "rls");
 		$parameters{$u} = parse_oi($parameters{$u}) if ($u eq "oi");
+        $parameters{$u} = parse_sxsrf($parameters{$u}) if ($u eq "sxsrf");
 		$parameters{$u} .= "\t\t(A user was logged in)" if ($u eq "sig2"); # https://moz.com/blog/decoding-googles-referral-string-or-how-i-survived-secure-search
 		$parameters{$u} .= "\t\t(Browser Window Height)" if ($u eq "bih"); #https://www.reddit.com/r/explainlikeimfive/comments/2ecozy/eli5_when_you_search_for_something_on_google_the/
 		$parameters{$u} .= "\t\t(Browser Window Width)" if ($u eq "biw");
@@ -339,6 +341,20 @@ sub parse_URL($){
 }
 
 
+# Currently unsure what this timestamp means
+# This is seen from September 2019 (unsure where it first begun)
+# Only when going to google, clicking the search box and searching with Chrome. Untested for other browsers.
+# Possibly region based.
+sub parse_sxsrf($){
+    my $sxsrf = shift;    
+    my @params = split /\:/, $sxsrf;
+    my $first = $params[0];
+    my $second = $params[1]/1000;
+    my $unix = modify_unix_timezone($second);
+    my $comment = $unix;
+        
+    return "$sxsrf\t\t($comment)";
+}
 
 
 # found when examining the cache files. so far seen on chrome havent tested anything else
@@ -1072,7 +1088,9 @@ sub modify_unix_timezone($){
 		}
 		my $timezone = $timezone_modifier * (60 * 60);
 		my $comment = "";
-		my $gm_unix = gmtime($unix+$timezone);
+		#my $gm_unix = gmtime($unix+$timezone);
+        
+        my $gm_unix = strftime "%Y-%m-%d %H-%M-%S", gmtime($unix+$timezone);
 	
 		# check to see if its either +12,12,0, -12, throw error if not
 	

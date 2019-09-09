@@ -26,14 +26,19 @@
 #
 # Version History:
 # v2014-10-10 Initial Version
+# v2019-09-09 Update to python3 by PM
 
 import sys
 from optparse import OptionParser
 import datetime
 import base64
-import urlparse
 
-version_string = "google-ei-time.py v2014-10-10"
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
+
+version_string = "google-ei-time.py v2019-09-09"
 usage = "%prog -e EITERM -q OR %prog -u URL -q"
 
 parser = OptionParser(usage=usage)
@@ -49,7 +54,7 @@ parser.add_option("-q", dest="quiet",
 (options, args) = parser.parse_args()
 
 if not (options.quiet):
-    print "Running " + version_string + "\n"
+    print ("Running " + version_string + "\n")
 
 # No arguments given by user, print help and exit
 if len(sys.argv) == 1:
@@ -57,35 +62,37 @@ if len(sys.argv) == 1:
     exit(-1)
 
 if ((options.eiterm == None) and (options.url == None)):
-    print "Error! Neither ei or URL terms were specified. Choose one!\n"
+    print ("Error! Neither ei or URL terms were specified. Choose one!\n")
     parser.print_help()
     exit(-1)
 
 if ((options.eiterm != None) and (options.url != None)):
-    print "Error! BOTH ei and URL terms were specified. Choose one!\n"
+    print ("Error! BOTH ei and URL terms were specified. Choose one!\n")
     parser.print_help()
     exit(-1)
 
 ei = ""
 if (options.url != None):    
-    parsed = urlparse.urlparse(options.url)
+    parsed = urlparse(options.url)
+    #parsed = urlparse.urlparse(options.url)
     #print parsed
     # returns a 6 tuple list. The element we're interested in is "parsed.query" 
     if ("ei" not in parsed.query):
         if not (options.quiet):
-            print "No ei parameter found in URL!"
+            print ("No ei parameter found in URL!")
         exit(-1)
 
     # search parsed query for "ei" parameter and extract the returned list item
     # parse_qs returns a dictionary item, hence the following ["ei"]. 
     # The dictionary value is a list, hence the following [0]
     ei = urlparse.parse_qs(parsed.query)["ei"][0]
+    #ei = urlparse.parse_qs(parsed.query)["ei"][0]
     if not (options.quiet):
-        print "URL's ei term = " + ei
+        print ("URL's ei term = " + ei)
 else:
     ei = options.eiterm
     if not (options.quiet):
-        print "Input ei term = " + ei
+        print ("Input ei term = " + ei)
 
 # ei parameter may require padding (length must be a multiple of 4 for Python's base64 decode)
 num_extra_bytes = (len(ei) % 4) # equals number of extra bytes past last multiple of 4 eg equals 1 for ei length of 21
@@ -96,7 +103,7 @@ else:
     padstring = ei
 
 if not (options.quiet):
-    print "Padded base64 string = " + padstring
+    print ("Padded base64 string = " + padstring)
 
 # Apparently the base64 string are made URL safe by substituting - instead of + and _ instead of /
 # Python base64 conveniently has a "urlsafe_b64decode" function to handle the reverse of the above substitution
@@ -113,10 +120,11 @@ decoded = base64.urlsafe_b64decode(padstring)
 # Each byte range is 256 times the previous bytes range
 # ie xFF = 255, xFF00 = 255 * 256 = 65280 dec, xFF0000 = 255 * 256 *256 = 16711680 dec
 # Calling "ord" converts the given byte string into a number
-timestamp = ord(decoded[0]) + ord(decoded[1])*256 + ord(decoded[2])*(256**2) + ord(decoded[3])*(256**3)
+timestamp = (decoded[0]) + (decoded[1])*256 + (decoded[2])*(256**2) + (decoded[3])*(256**3)
+#timestamp = ord(decoded[0]) + ord(decoded[1])*256 + ord(decoded[2])*(256**2) + ord(decoded[3])*(256**3)
 
 if not (options.quiet):
-    print "Extracted timestamp = " + str(timestamp)
+    print ("Extracted timestamp = " + str(timestamp))
 
 try: 
     datetimestr = datetime.datetime.utcfromtimestamp(timestamp).strftime('%Y-%m-%dT%H:%M:%S')
@@ -124,8 +132,8 @@ except:
     datetimestr = "Unknown"
 
 if not (options.quiet):
-    print "Human readable timestamp (UTC) = " + datetimestr
+    print ("Human readable timestamp (UTC) = " + datetimestr)
 else:
-    print datetimestr
+    print (datetimestr)
 
 exit(0)
