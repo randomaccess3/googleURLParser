@@ -42,3 +42,8 @@ Linux (debian)
 
 ### Known Issues: 
 * Doesn't parse the data in the fragment (after the #)
+
+### Credits
+It's in the code but I realised I didn't link to the original modules that I've included in this repo for ease of use
+1. Cheeky4n6Monkey for Google-Ei-time - https://raw.githubusercontent.com/cheeky4n6monkey/4n6-scripts/master/google-ei-time.py
+2. Tom Anthony and Benjamin Schulz (https://github.com/TomAnthony/ved-decoder/ which is an updated fork of the code by https://github.com/beschulz)
